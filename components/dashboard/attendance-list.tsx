@@ -60,11 +60,11 @@ export default function AttendanceList({ phone }: { phone: string }) {
                 <h3 className="py-2 pr-4">UIC475200</h3>  <h3 className="py-2 pr-4">Anirudh Singh</h3><h3 className="py-2 pr-4">Executive</h3>
                  <h3 className="py-2 pr-4">9516970365</h3>
               </p>
-              <div className="bg-black w-48 rounded-2xl">
+              <div className="bg-black w-56 rounded-2xl">
               <button
               type="button"
               onClick={handleCheckIn}
-              className={`w-24 h-12 rounded-2xl text-white ${
+              className={`w-24 h-12 rounded-2xl text-white m-2 ${
                 atLocation ? "bg-black hover:bg-gray-900" : "bg-gray-400 cursor-not-allowed"
               }`}
               disabled={!atLocation}
@@ -74,7 +74,7 @@ export default function AttendanceList({ phone }: { phone: string }) {
               <button
               type="button"
               onClick={handleDayOut}
-              className={`w-24 h-12 rounded-2xl text-white ${
+              className={`w-24 h-12 rounded-2xl m-2 text-white ${
                 checkIn ? "bg-gray-700 hover:bg-gray-900" : "bg-gray-400 cursor-not-allowed"
               }`}
               disabled={!checkIn}
