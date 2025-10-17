@@ -9,70 +9,101 @@ import { useRouter } from "next/navigation"
 import Image from "next/image"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
-const OTP_CODE = "123456"
-
-export default function LoginOTP() {
+export default function Login() {
   const router = useRouter()
   const [phone, setPhone] = useState("")
-  const [sent, setSent] = useState(false)
-  const [otp, setOtp] = useState("")
+  const [password, setPassword] = useState("")
   const [role, setRole] = useState<"executive" | "manager" | "admin">("executive")
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  // if user already logged in
+  // useEffect(() => {
+  //   try {
+  //     const auth = localStorage.getItem("auth")
+  //     if (auth) {
+  //       const a = JSON.parse(auth)
+  //       if (a?.role === "executive") router.replace("/dashboard")
+  //       else router.replace("/admin")
+  //     }
+  //   } catch {}
+  // }, [router])
+
+
   useEffect(() => {
-    // if already logged-in, go to appropriate area
-    try {
-      const auth = localStorage.getItem("auth")
-      if (auth) {
-        const a = JSON.parse(auth)
-        if (a?.role === "executive") router.replace("/dashboard")
+  try {
+    const auth = localStorage.getItem("auth")
+    if (auth) {
+      const a = JSON.parse(auth)
+      // Only redirect if both phone and role exist
+      if (a?.phone && a?.role) {
+        if (a.role === "executive") router.replace("/dashboard")
         else router.replace("/admin")
       }
-    } catch {}
-  }, [router])
+    }
+  } catch {}
+}, [router])
 
-  const sendOtp = () => {
-    setError(null)
-    if (!/^\d{10}$/.test(phone)) {
-      setError("Enter a valid 10-digit mobile number")
-      return
-    }
-    setSent(true)
-  }
 
-  const verifyOtp = () => {
-    setError(null)
-    if (otp !== OTP_CODE) {
-      setError("Invalid OTP. Try 123456 for demo.")
-      return
-    }
-    setLoading(true)
-    // Save auth session
-    const auth = { phone, role, ts: Date.now() }
-    localStorage.setItem("auth", JSON.stringify(auth))
-    // bootstrap user record store if not present
-    const users = JSON.parse(localStorage.getItem("users") || "[]")
-    const exists = users.find((u: any) => u.phone === phone)
-    if (!exists) {
-      users.push({
-        phone,
-        role,
-        name: "",
-        profileCompleted: false,
-        id: `U${Math.floor(Math.random() * 100000)}`,
-      })
-      localStorage.setItem("users", JSON.stringify(users))
-    }
-    setTimeout(() => {
-      setLoading(false)
-      if (role === "executive") {
-        router.replace("/dashboard")
-      } else {
-        router.replace("/admin")
-      }
-    }, 400)
+  // const handleLogin = () => {
+  //   setError(null)
+
+  //   // validation
+  //   if (!/^\d{10}$/.test(phone)) {
+  //     setError("Enter a valid 10-digit mobile number")
+  //     return
+  //   }
+  //   if (!password || password.length < 4) {
+  //     setError("Enter a valid password (min 4 characters)")
+  //     return
+  //   }
+
+  //   setLoading(true)
+
+  //   // Fetch users from localStorage (simulating DB)
+  //   const users = JSON.parse(localStorage.getItem("users") || "[]")
+  //   const user = users.find((u: any) => u.phone === phone && u.password === password)
+
+  //   if (!user) {
+  //     setError("Invalid phone number or password")
+  //     setLoading(false)
+  //     return
+  //   }
+
+  //   // Save auth session
+  //   const auth = { phone, role: user.role, ts: Date.now() }
+  //   localStorage.setItem("auth", JSON.stringify(auth))
+
+  //   // redirect based on role
+  //   setTimeout(() => {
+  //     setLoading(false)
+  //     if (user.role === "executive") router.replace("/dashboard")
+  //     else router.replace("/admin")
+  //   }, 400)
+  // }
+
+  const handleLogin = async () => {
+  setError(null)
+  setLoading(true)
+  try {
+    const res = await fetch("/api/auth/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ phone, password }),
+    })
+    const data = await res.json()
+    if (!res.ok) throw new Error(data.error || "Login failed")
+    localStorage.setItem("token", data.token)
+    localStorage.setItem("auth", JSON.stringify({ phone, role: data.employee.role }))
+    if (data.employee.role === "executive") router.replace("/dashboard")
+    else router.replace("/admin")
+  } catch (err: any) {
+    setError(err.message)
+  } finally {
+    setLoading(false)
   }
+}
+
 
   return (
     <Card className="border">
@@ -80,8 +111,9 @@ export default function LoginOTP() {
         <div className="flex items-center justify-center">
           <Image src="/images/logo.png" alt="Company Logo" width={125} height={80} className="rounded-md" />
         </div>
-        <CardTitle className="text-center text-balance">Sign in with Mobile OTP</CardTitle>
+        <CardTitle className="text-center text-balance">Employee Login</CardTitle>
       </CardHeader>
+
       <CardContent className="space-y-4">
         <div className="grid gap-2">
           <Label htmlFor="phone">Mobile Number</Label>
@@ -94,6 +126,18 @@ export default function LoginOTP() {
             onChange={(e) => setPhone(e.target.value.replace(/\D/g, ""))}
           />
         </div>
+
+        <div className="grid gap-2">
+          <Label htmlFor="password">Password</Label>
+          <Input
+            id="password"
+            type="password"
+            placeholder="Enter your password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+          />
+        </div>
+
         <div className="grid gap-2">
           <Label htmlFor="role">Login as</Label>
           <Select value={role} onValueChange={(v: any) => setRole(v)}>
@@ -108,32 +152,14 @@ export default function LoginOTP() {
           </Select>
         </div>
 
-        {!sent ? (
-          <Button className="w-full" onClick={sendOtp}>
-            Send OTP
-          </Button>
-        ) : (
-          <>
-            <div className="grid gap-2">
-              <Label htmlFor="otp">OTP</Label>
-              <Input
-                id="otp"
-                inputMode="numeric"
-                maxLength={6}
-                placeholder="Enter OTP (123456)"
-                value={otp}
-                onChange={(e) => setOtp(e.target.value.replace(/\D/g, ""))}
-              />
-            </div>
-            <Button className="w-full" disabled={loading} onClick={verifyOtp}>
-              {loading ? "Verifying..." : "Verify & Continue"}
-            </Button>
-          </>
-        )}
+        <Button className="w-full" disabled={loading} onClick={handleLogin}>
+          {loading ? "Logging in..." : "Login"}
+        </Button>
 
         {error && <p className="text-sm text-destructive">{error}</p>}
+
         <p className="text-xs text-muted-foreground">
-          By continuing you agree to our Terms and acknowledge our Privacy Policy.
+          By continuing, you agree to our Terms and acknowledge our Privacy Policy.
         </p>
       </CardContent>
     </Card>

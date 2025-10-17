@@ -44,23 +44,7 @@ export default function AttendanceList({ phone }: { phone: string }) {
   // }, [phone])
 
   return (
-    <Card >
-      <CardHeader>
-        <CardTitle>Employee Details</CardTitle>
-      </CardHeader>
-      <CardContent >
-        <div className="overflow-x-auto items-center">
-          <p className="w-full text-sm cols col-span-1 columns-2">
-            
-              
-                <h3 className="py-2 pr-4">Employee ID :</h3> 
-                <h3 className="py-2 pr-4">Name :</h3> 
-                <h3 className="py-2 pr-4">Role :</h3>
-                <h3 className="py-2 pr-4">Mobile Number :</h3>
-                <h3 className="py-2 pr-4">UIC475200</h3>  <h3 className="py-2 pr-4">Anirudh Singh</h3><h3 className="py-2 pr-4">Executive</h3>
-                 <h3 className="py-2 pr-4">9516970365</h3>
-              </p>
-              <div className="bg-black w-56 rounded-2xl">
+    <div>
               <button
               type="button"
               onClick={handleCheckIn}
@@ -80,7 +64,8 @@ export default function AttendanceList({ phone }: { phone: string }) {
               disabled={!checkIn}
             >
               Day-Out
-            </button></div>
+            </button>
+            
             {/* <tbody> */}
               {/* {rows.length === 0 && (
                 <tr>
@@ -107,8 +92,7 @@ export default function AttendanceList({ phone }: { phone: string }) {
               ))} */}
             {/* </tbody> */}
           {/* </table> */}
-        </div>
-      </CardContent>
-    </Card>
+            </div>
+      
   )
 }

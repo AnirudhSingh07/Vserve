@@ -6,8 +6,15 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import Navbar from "@/components/Navbar"
 import AttendanceList from "@/components/dashboard/attendance-list"
-import { OFFICE_CENTER, OFFICE_RADIUS_METERS, isWithinCheckinWindow, haversineMeters, todayKey } from "@/lib/constants"
+import {
+  OFFICE_CENTER,
+  OFFICE_RADIUS_METERS,
+  isWithinCheckinWindow,
+  haversineMeters,
+  todayKey,
+} from "@/lib/constants"
 import { GoogleMap, Marker, Circle, Polyline, useJsApiLoader } from "@react-google-maps/api"
+import { Loader2 } from "lucide-react"
 
 type TrackPoint = { lat: number; lng: number; ts: number }
 type AttendanceRecord = {
@@ -25,20 +32,41 @@ const mapContainerStyle = { width: "100%", height: "320px" }
 
 export default function DashboardPage() {
   const router = useRouter()
+
+  // --- All hooks declared at the top ---
   const [authPhone, setAuthPhone] = useState<string | null>(null)
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null)
   const [inside, setInside] = useState(false)
   const [checkedIn, setCheckedIn] = useState(false)
   const [attRec, setAttRec] = useState<AttendanceRecord | null>(null)
   const [path, setPath] = useState<Array<[number, number]>>([])
+  const [employees, setEmployees] = useState<any[]>([])
+  const [error, setError] = useState<string | null>(null)
+  const [loading, setLoading] = useState(true)
 
-  // Load Google Maps
   const { isLoaded } = useJsApiLoader({
     id: "google-map-script",
     googleMapsApiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || "",
   })
 
-  // Load auth and current record
+  // --- Fetch employees ---
+  useEffect(() => {
+    const fetchEmployees = async () => {
+      try {
+        const res = await fetch("/api/employees")
+        const data = await res.json()
+        if (!data.success) throw new Error(data.error)
+        setEmployees(data.employees)
+      } catch (err: any) {
+        setError(err.message)
+      } finally {
+        setLoading(false)
+      }
+    }
+    fetchEmployees()
+  }, [])
+
+  // --- Load auth and today's record ---
   useEffect(() => {
     const a = JSON.parse(localStorage.getItem("auth") || "null")
     if (!a || a.role !== "executive") {
@@ -46,6 +74,7 @@ export default function DashboardPage() {
       return
     }
     setAuthPhone(a.phone)
+
     const k = `attendance:${a.phone}`
     const all = JSON.parse(localStorage.getItem(k) || "{}")
     const rec: AttendanceRecord = all[todayKey()] || null
@@ -74,10 +103,12 @@ export default function DashboardPage() {
     }
   }, [router])
 
+  // --- Memo for check-in availability ---
   const canCheckIn = useMemo(() => {
     return isWithinCheckinWindow(new Date()) && inside && !checkedIn
   }, [inside, checkedIn])
 
+  // --- Attendance actions ---
   const markAttendance = () => {
     if (!authPhone || !coords) return
     const k = `attendance:${authPhone}`
@@ -134,7 +165,7 @@ export default function DashboardPage() {
     router.replace("/login")
   }
 
-  // Update GPS path in real-time
+  // --- Real-time GPS tracking ---
   useEffect(() => {
     if (!checkedIn || !navigator.geolocation || !authPhone) return
     const watchId = navigator.geolocation.watchPosition(
@@ -143,8 +174,6 @@ export default function DashboardPage() {
         setCoords(c)
         const inside = haversineMeters(c, OFFICE_CENTER) <= OFFICE_RADIUS_METERS
         setInside(inside)
-        onCoords?.(c)
-        onInsideRadius?.(inside)
 
         // Save to localStorage
         const storeKey = `attendance:${authPhone}`
@@ -161,43 +190,86 @@ export default function DashboardPage() {
     return () => navigator.geolocation.clearWatch(watchId)
   }, [checkedIn, authPhone])
 
+  // --- Conditional returns after all hooks ---
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center h-[70vh]">
+        <Loader2 className="animate-spin h-8 w-8 text-primary" />
+      </div>
+    )
+  }
+
+  if (error) {
+    return <p className="text-center text-red-500 mt-10">{error}</p>
+  }
+
   return (
-    <div> 
+    <div>
       <Navbar />
-    <main className="p-4 max-w-5xl mx-auto space-y-6 mt-[20vw]">
-      {/* ... existing header, cards, attendance controls, AttendanceList ... */}
+      <main className="p-4 max-w-5xl mx-auto space-y-6 mt-[20vw]">
+        {/* Employee List */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Employee List</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {employees.length > 0 ? (
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="border-b">
+                    <th className="py-2">Name</th>
+                    <th className="py-2">Phone</th>
+                    <th className="py-2">Email</th>
+                    <th className="py-2">Role</th>
+                    <th className="py-2">Department</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {employees.map((emp) => (
+                    <tr key={emp._id} className="border-b hover:bg-gray-50">
+                      <td className="py-2">{emp.name}</td>
+                      <td className="py-2">{emp.phone}</td>
+                      <td className="py-2">{emp.email}</td>
+                      <td className="py-2">{emp.role}</td>
+                      <td className="py-2">{emp.department}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            ) : (
+              <p>No employees found.</p>
+            )}
+          </CardContent>
+        </Card>
 
-      <AttendanceList phone={authPhone || ""} />
+        {/* Attendance List */}
+        <AttendanceList phone={authPhone || ""} />
 
-      {/* Google Map at the end */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Live GPS Map</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {isLoaded && (
-            <GoogleMap
-              mapContainerStyle={mapContainerStyle}
-              center={coords || OFFICE_CENTER}
-              zoom={17}
-            >
-              <Circle
-                center={OFFICE_CENTER}
-                radius={OFFICE_RADIUS_METERS}
-                options={{ strokeColor: "#3b82f6", fillColor: "#93c5fd", fillOpacity: 0.2 }}
-              />
-              {coords && <Marker position={coords} />}
-              {path.length > 1 && (
-                <Polyline
-                  path={path.map(([lat, lng]) => ({ lat, lng }))}
-                  options={{ strokeColor: "#16a34a", strokeWeight: 4 }}
+        {/* Google Map */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Live GPS Map</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {isLoaded && (
+              <GoogleMap mapContainerStyle={mapContainerStyle} center={coords || OFFICE_CENTER} zoom={17}>
+                <Circle
+                  center={OFFICE_CENTER}
+                  radius={OFFICE_RADIUS_METERS}
+                  options={{ strokeColor: "#3b82f6", fillColor: "#93c5fd", fillOpacity: 0.2 }}
                 />
-              )}
-            </GoogleMap>
-          )}
-        </CardContent>
-      </Card>
-    </main>
+                {coords && <Marker position={coords} />}
+                {path.length > 1 && (
+                  <Polyline
+                    path={path.map(([lat, lng]) => ({ lat, lng }))}
+                    options={{ strokeColor: "#16a34a", strokeWeight: 4 }}
+                  />
+                )}
+              </GoogleMap>
+            )}
+          </CardContent>
+        </Card>
+      </main>
     </div>
   )
 }
