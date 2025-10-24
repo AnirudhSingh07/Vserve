@@ -1,22 +1,34 @@
 "use client"
 
 import Link from "next/link"
-import { usePathname } from "next/navigation"
-import { useState } from "react"
+import { usePathname, useRouter } from "next/navigation"
+import { useState, useEffect } from "react"
 import { Menu, X } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
 import { Button } from "@/components/ui/button"
 
 const navLinks = [
   { name: "Home", href: "/" },
-  { name: "Attendance", href: "/attendance" },
-  { name: "Map", href: "/map" },
   { name: "Profile", href: "/profile" },
 ]
 
 export default function Navbar() {
   const pathname = usePathname()
+  const router = useRouter()
   const [open, setOpen] = useState(false)
+  const [isLoggedIn, setIsLoggedIn] = useState(false)
+
+  // Check login status (you can modify this according to your auth logic)
+  useEffect(() => {
+    const token = localStorage.getItem("token") // or your auth key
+    setIsLoggedIn(!!token)
+  }, [])
+
+  const handleSignOut = () => {
+    localStorage.removeItem("token")
+    setIsLoggedIn(false)
+    router.push("/login")
+  }
 
   return (
     <nav className="w-full bg-white/80 backdrop-blur-lg shadow-sm fixed top-0 left-0 z-50 border-b border-gray-200">
@@ -46,12 +58,20 @@ export default function Navbar() {
 
           {/* Action Buttons */}
           <div className="hidden md:flex items-center space-x-4">
-            <Button variant="outline" asChild>
-              <Link href="/login">Login</Link>
-            </Button>
-            <Button asChild>
-              <Link href="/register">Sign Up</Link>
-            </Button>
+            {!isLoggedIn ? (
+              <>
+                <Button variant="outline" asChild>
+                  <Link href="/login">Login</Link>
+                </Button>
+                <Button asChild>
+                  <Link href="/register">Sign Up</Link>
+                </Button>
+              </>
+            ) : (
+              <Button variant="destructive" onClick={handleSignOut}>
+                Sign Out
+              </Button>
+            )}
           </div>
 
           {/* Mobile Menu Button */}
@@ -89,14 +109,30 @@ export default function Navbar() {
                 </Link>
               ))}
               <hr className="border-gray-200" />
-              <Link href="/login" onClick={() => setOpen(false)}>
-                <Button variant="outline" className="w-full">
-                  Login
+
+              {!isLoggedIn ? (
+                <>
+                  <Link href="/login" onClick={() => setOpen(false)}>
+                    <Button variant="outline" className="w-full">
+                      Login
+                    </Button>
+                  </Link>
+                  <Link href="/register" onClick={() => setOpen(false)}>
+                    <Button className="w-full">Sign Up</Button>
+                  </Link>
+                </>
+              ) : (
+                <Button
+                  variant="destructive"
+                  className="w-full"
+                  onClick={() => {
+                    setOpen(false)
+                    handleSignOut()
+                  }}
+                >
+                  Sign Out
                 </Button>
-              </Link>
-              <Link href="/register" onClick={() => setOpen(false)}>
-                <Button className="w-full">Sign Up</Button>
-              </Link>
+              )}
             </div>
           </motion.div>
         )}
