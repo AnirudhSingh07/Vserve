@@ -6,6 +6,8 @@ import jwt from "jsonwebtoken"
 
 const JWT_SECRET = process.env.JWT_SECRET as string
 
+
+
 export async function POST(req: Request) {
   await connectDB()
   const { phone, password } = await req.json()

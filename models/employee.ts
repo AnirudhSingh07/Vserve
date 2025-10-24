@@ -1,14 +1,20 @@
-import { DropdownMenu } from "@radix-ui/react-dropdown-menu";
-import { setOptions } from "leaflet";
-import { Phone } from "lucide-react";
 import mongoose, { Schema, models } from "mongoose";
 
-const EmployeeSchema = new Schema({
-  phone: { type: String, required: true, unique: true },
-  passwordHash: { type: String, required: true },
-  name: { type: String },
-  role: { type: String },
-});
+const EmployeeSchema = new Schema(
+  {
+    name: { type: String, required: true },
+    fatherName: { type: String, required: true },
+    phone: { type: String, required: true, unique: true },
+    passwordHash: { type: String, required: true },
+    role: { type: String, default: "employee" },
+    panCard: { type: String, required: true },
+    bankAccountNumber: { type: String, required: true },
+    dateOfJoining: { type: Date, required: true },
+    addressProof: { type: String, required: true }, // can store file URL or base64
+    idCardNumber: { type: String, required: true },
+  },
+  { timestamps: true }
+);
 
-export default models.Employee || mongoose.model("Employee", EmployeeSchema);
-
+const Employee = models.Employee || mongoose.model("Employee", EmployeeSchema);
+export default Employee;
