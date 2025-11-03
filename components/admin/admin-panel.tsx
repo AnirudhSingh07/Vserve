@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -28,6 +29,7 @@ import {
 } from "lucide-react";
 
 type User = {
+  _id: string;
   id: string;
   phone: string;
   role: string;
@@ -54,6 +56,7 @@ type LateReq = {
 };
 
 export default function AdminPanel() {
+  const router = useRouter();
   const [admin, setAdmin] = useState<User | null>(null);
   const [users, setUsers] = useState<User[]>([]);
   const [attRows, setAttRows] = useState<
@@ -90,7 +93,7 @@ export default function AdminPanel() {
 
         setAdmin(adminData.employee || null);
         setUsers(empData.employees || []);
-
+        console.log("users", empData.employees);
         const attRes = await fetch("/api/attendance", {
           credentials: "include",
         });
@@ -187,6 +190,13 @@ export default function AdminPanel() {
   };
 
   const pendingLateReqs = lateReqs.filter((r) => r.status === "pending");
+
+  const openUserProfile = (id: string) => {
+    const user = users.find((u) => u._id === id);
+    console.log("user", user);
+    if (!user) return alert("User not found");
+    router.push(`/profile/employee/${user._id}`);
+  };
 
   const toggleEmployeeExpand = (id: string) => {
     setExpandedEmployeeId((prev) => (prev === id ? null : id));
@@ -339,7 +349,7 @@ export default function AdminPanel() {
                           <Button
                             onClick={(e) => {
                               e.stopPropagation();
-                              toggleEmployeeExpand(uid);
+                              openUserProfile(u._id);
                             }}
                           >
                             View Profile
