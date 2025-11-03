@@ -1,4 +1,4 @@
-export const OFFICE_CENTER = { lat: 23.1575299, lng: 75.79963555 }; // (example)
+export const OFFICE_CENTER = { lat: 22.99793312024704, lng: 76.06059952886626 }; // (example)22.99793312024704, 76.06059952886626
 export const OFFICE_RADIUS_METERS = 200000; // 200m
 
 export function haversineMeters(

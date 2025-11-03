@@ -1,37 +1,50 @@
 import { NextRequest, NextResponse } from "next/server";
 import { connectDB } from "@/lib/db";
-import { Attendance } from "@/models/attendance";
+import Employee from "@/models/employee";
+import Attendance from "@/models/attendance";
+import dayjs from "dayjs";
 
 export async function POST(req: NextRequest) {
   try {
-    const body = await req.json();
-    const { phone, coords } = body;
-
-    if (!phone || !coords) {
-      return NextResponse.json({ success: false, error: "Missing phone or coordinates" }, { status: 400 });
-    }
-
     await connectDB();
+    const { phone, coords } = await req.json();
 
-    const today = new Date().toISOString().slice(0, 10);
-    const record = await Attendance.findOne({ phone, date: today });
+    if (!phone || !coords)
+      return NextResponse.json({ success: false, error: "Missing data" });
 
-    if (!record?.checkInTime) {
-      return NextResponse.json({ success: false, error: "Not checked in yet" }, { status: 400 });
-    }
+    const employee = await Employee.findOne({ phone });
+    if (!employee)
+      return NextResponse.json({ success: false, error: "Employee not found" });
 
-    if (record.checkOutTime) {
-      return NextResponse.json({ success: false, error: "Already checked out" }, { status: 400 });
-    }
+    const today = dayjs().startOf("day").toDate();
 
-    record.checkOutTime = Date.now();
-    record.checkOutLocation = coords;
+    const attendance = await Attendance.findOne({
+      employee: employee._id,
+      date: { $gte: today },
+    });
 
-    await record.save();
+    if (!attendance?.checkInTime)
+      return NextResponse.json({
+        success: false,
+        error: "No check-in found for today",
+      });
 
-    return NextResponse.json({ success: true, record }, { status: 200 });
+    if (attendance.checkOutTime)
+      return NextResponse.json({
+        success: false,
+        error: "Already checked out today",
+      });
+
+    attendance.checkOutTime = Date.now();
+    attendance.checkOutLocation = coords;
+    await attendance.save();
+
+    return NextResponse.json({ success: true });
   } catch (err: any) {
-    console.error("Check-out error:", err);
-    return NextResponse.json({ success: false, error: "Server error" }, { status: 500 });
+    console.error("❌ Check-out error:", err);
+    return NextResponse.json(
+      { success: false, error: "Server error during check-out" },
+      { status: 500 }
+    );
   }
 }
