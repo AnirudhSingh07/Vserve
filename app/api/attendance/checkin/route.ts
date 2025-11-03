@@ -1,39 +1,51 @@
 import { NextRequest, NextResponse } from "next/server";
 import { connectDB } from "@/lib/db";
-import { Attendance } from "@/models/attendance";
+import Employee from "@/models/employee";
+import Attendance from "@/models/attendance"; // You must have an Attendance model
+import dayjs from "dayjs";
 
 export async function POST(req: NextRequest) {
   try {
-    const body = await req.json();
-    const { phone, coords } = body;
-
-    if (!phone || !coords) {
-      return NextResponse.json({ success: false, error: "Missing phone or coordinates" }, { status: 400 });
-    }
-
     await connectDB();
+    const { phone, coords } = await req.json();
 
-    const today = new Date().toISOString().slice(0, 10);
-    let record = await Attendance.findOne({ phone, date: today });
+    if (!phone || !coords)
+      return NextResponse.json({ success: false, error: "Missing data" });
 
-    if (record?.checkInTime) {
-      return NextResponse.json({ success: false, error: "Already checked in" }, { status: 400 });
-    }
+    const employee = await Employee.findOne({ phone });
+    if (!employee)
+      return NextResponse.json({ success: false, error: "Employee not found" });
 
-    const status = new Date().getHours() < 10 ? "on-time" : "late"; // example logic
+    const today = dayjs().startOf("day").toDate();
 
-    if (!record) record = new Attendance({ phone, date: today });
+    // Prevent double check-in
+    const existing = await Attendance.findOne({
+      employee: employee._id,
+      date: { $gte: today },
+    });
+    if (existing?.checkInTime)
+      return NextResponse.json({
+        success: false,
+        error: "Already checked in today",
+      });
 
-    record.checkInTime = Date.now();
-    record.checkInLocation = coords;
-    record.status = status;
-    record.track = [];
+    const attendance =
+      existing ||
+      new Attendance({
+        employee: employee._id,
+        date: new Date(),
+      });
 
-    await record.save();
+    attendance.checkInTime = Date.now();
+    attendance.checkInLocation = coords;
+    await attendance.save();
 
-    return NextResponse.json({ success: true, record }, { status: 200 });
+    return NextResponse.json({ success: true });
   } catch (err: any) {
-    console.error("Check-in error:", err);
-    return NextResponse.json({ success: false, error: "Server error" }, { status: 500 });
+    console.error("❌ Check-in error:", err);
+    return NextResponse.json(
+      { success: false, error: "Server error during check-in" },
+      { status: 500 }
+    );
   }
 }
