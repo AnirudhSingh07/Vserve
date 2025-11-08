@@ -1,117 +1,97 @@
-"use client"
+"use client";
 
-import { useEffect, useState } from "react"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Button } from "@/components/ui/button"
-import { useRouter } from "next/navigation"
-import Image from "next/image"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { useEffect, useState } from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Button } from "@/components/ui/button";
+import { useRouter } from "next/navigation";
+import Image from "next/image";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 export default function Login() {
-  const router = useRouter()
-  const [phone, setPhone] = useState("")
-  const [password, setPassword] = useState("")
-  const [role, setRole] = useState<"executive" | "manager" | "admin">("executive")
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const router = useRouter();
+  const [phone, setPhone] = useState("");
+  const [password, setPassword] = useState("");
+  const [role, setRole] = useState<"executive" | "manager" | "admin">(
+    "executive"
+  );
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  // if user already logged in
-  // useEffect(() => {
-  //   try {
-  //     const auth = localStorage.getItem("auth")
-  //     if (auth) {
-  //       const a = JSON.parse(auth)
-  //       if (a?.role === "executive") router.replace("/dashboard")
-  //       else router.replace("/admin")
-  //     }
-  //   } catch {}
-  // }, [router])
-
-
+  // ✅ Auto-redirect if already logged in (server check)
   useEffect(() => {
-  try {
-    const auth = localStorage.getItem("auth")
-    if (auth) {
-      const a = JSON.parse(auth)
-      // Only redirect if both phone and role exist
-      if (a?.phone && a?.role) {
-        if (a.role === "executive") router.replace("/dashboard")
-        else router.replace("/admin")
+    const checkLogin = async () => {
+      try {
+        const res = await fetch("/api/me", { credentials: "include" });
+        const data = await res.json();
+        if (data.loggedIn && data.user) {
+          if (data.user.role === "executive") router.replace("/dashboard");
+          else router.replace("/admin");
+        }
+      } catch {
+        // ignore
       }
-    }
-  } catch {}
-}, [router])
+    };
+    checkLogin();
+  }, [router]);
 
-
-  // const handleLogin = () => {
-  //   setError(null)
-
-  //   // validation
-  //   if (!/^\d{10}$/.test(phone)) {
-  //     setError("Enter a valid 10-digit mobile number")
-  //     return
-  //   }
-  //   if (!password || password.length < 4) {
-  //     setError("Enter a valid password (min 4 characters)")
-  //     return
-  //   }
-
-  //   setLoading(true)
-
-  //   // Fetch users from localStorage (simulating DB)
-  //   const users = JSON.parse(localStorage.getItem("users") || "[]")
-  //   const user = users.find((u: any) => u.phone === phone && u.password === password)
-
-  //   if (!user) {
-  //     setError("Invalid phone number or password")
-  //     setLoading(false)
-  //     return
-  //   }
-
-  //   // Save auth session
-  //   const auth = { phone, role: user.role, ts: Date.now() }
-  //   localStorage.setItem("auth", JSON.stringify(auth))
-
-  //   // redirect based on role
-  //   setTimeout(() => {
-  //     setLoading(false)
-  //     if (user.role === "executive") router.replace("/dashboard")
-  //     else router.replace("/admin")
-  //   }, 400)
-  // }
-
+  // ✅ Handle login through backend
   const handleLogin = async () => {
-  setError(null)
-  setLoading(true)
-  try {
-    const res = await fetch("/api/auth/login", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ phone, password }),
-    })
-    const data = await res.json()
-    if (!res.ok) throw new Error(data.error || "Login failed")
-    localStorage.setItem("token", data.token)
-    localStorage.setItem("auth", JSON.stringify({ phone, role: data.employee.role }))
-    if (data.employee.role === "executive") router.replace("/dashboard")
-    else router.replace("/admin")
-  } catch (err: any) {
-    setError(err.message)
-  } finally {
-    setLoading(false)
-  }
-}
+    setError(null);
 
+    if (!/^\d{10}$/.test(phone)) {
+      setError("Enter a valid 10-digit mobile number");
+      return;
+    }
+    if (!password || password.length < 4) {
+      setError("Enter a valid password (min 4 characters)");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const res = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phone, password }),
+        credentials: "include", // ✅ important for setting cookie
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Login failed");
+
+      // ✅ Cookie is set by the server now, no need for localStorage
+      if (data.employee?.role === "executive") router.replace("/dashboard");
+      else router.replace("/admin");
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
-    <Card className="border">
+    <Card className="border max-w-md mx-auto mt-20">
       <CardHeader className="space-y-3">
         <div className="flex items-center justify-center">
-          <Image src="/images/logo.png" alt="Company Logo" width={125} height={80} className="rounded-md" />
+          <Image
+            src="/images/logo.png"
+            alt="Company Logo"
+            width={125}
+            height={80}
+            className="rounded-md"
+          />
         </div>
-        <CardTitle className="text-center text-balance">Employee Login</CardTitle>
+        <CardTitle className="text-center text-balance">
+          Employee Login
+        </CardTitle>
       </CardHeader>
 
       <CardContent className="space-y-4">
@@ -159,9 +139,10 @@ export default function Login() {
         {error && <p className="text-sm text-destructive">{error}</p>}
 
         <p className="text-xs text-muted-foreground">
-          By continuing, you agree to our Terms and acknowledge our Privacy Policy.
+          By continuing, you agree to our Terms and acknowledge our Privacy
+          Policy.
         </p>
       </CardContent>
     </Card>
-  )
+  );
 }

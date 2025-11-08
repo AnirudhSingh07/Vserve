@@ -6,6 +6,13 @@ export function signToken(payload: any) {
   return jwt.sign(payload, SECRET, { expiresIn: "1d" });
 }
 
-export function verifyToken(token: string) {
-  return jwt.verify(token, SECRET);
-}
+export const verifyToken = (token: string) => {
+  try {
+    return jwt.verify(token, SECRET) as {
+      phone: string;
+      [key: string]: any;
+    };
+  } catch {
+    return null;
+  }
+};

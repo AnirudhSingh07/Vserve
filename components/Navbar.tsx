@@ -1,34 +1,46 @@
-"use client"
+"use client";
 
-import Link from "next/link"
-import { usePathname, useRouter } from "next/navigation"
-import { useState, useEffect } from "react"
-import { Menu, X } from "lucide-react"
-import { motion, AnimatePresence } from "framer-motion"
-import { Button } from "@/components/ui/button"
+import Link from "next/link";
+import { usePathname, useRouter } from "next/navigation";
+import { useState, useEffect } from "react";
+import { Menu, X } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import { Button } from "@/components/ui/button";
 
 const navLinks = [
   { name: "Home", href: "/" },
   { name: "Profile", href: "/profile" },
-]
+];
 
 export default function Navbar() {
-  const pathname = usePathname()
-  const router = useRouter()
-  const [open, setOpen] = useState(false)
-  const [isLoggedIn, setIsLoggedIn] = useState(false)
+  const pathname = usePathname();
+  const router = useRouter();
+  const [open, setOpen] = useState(false);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
 
-  // Check login status (you can modify this according to your auth logic)
+  // ✅ Check login status via cookie-aware API
   useEffect(() => {
-    const token = localStorage.getItem("token") // or your auth key
-    setIsLoggedIn(!!token)
-  }, [])
+    const checkAuth = async () => {
+      try {
+        const res = await fetch("/api/me", { credentials: "include" });
+        const data = await res.json();
+        setIsLoggedIn(data.loggedIn);
+      } catch {
+        setIsLoggedIn(false);
+      }
+    };
+    checkAuth();
+  }, []);
 
-  const handleSignOut = () => {
-    localStorage.removeItem("token")
-    setIsLoggedIn(false)
-    router.push("/login")
-  }
+  // ✅ Handle logout via API (clears cookie)
+  const handleSignOut = async () => {
+    await fetch("/api/auth/logout", {
+      method: "POST",
+      credentials: "include",
+    });
+    setIsLoggedIn(false);
+    router.push("/login");
+  };
 
   return (
     <nav className="w-full bg-white/80 backdrop-blur-lg shadow-sm fixed top-0 left-0 z-50 border-b border-gray-200">
@@ -36,7 +48,7 @@ export default function Navbar() {
         <div className="flex justify-between items-center h-16">
           {/* Logo */}
           <Link href="/" className="flex items-center space-x-2">
-            <img src="/images/logo.png" alt="" className="w-32 h-14" />
+            <img src="/images/logo.png" alt="Logo" className="w-32 h-14" />
           </Link>
 
           {/* Desktop Links */}
@@ -56,7 +68,7 @@ export default function Navbar() {
             ))}
           </div>
 
-          {/* Action Buttons */}
+          {/* Auth Buttons */}
           <div className="hidden md:flex items-center space-x-4">
             {!isLoggedIn ? (
               <>
@@ -126,8 +138,8 @@ export default function Navbar() {
                   variant="destructive"
                   className="w-full"
                   onClick={() => {
-                    setOpen(false)
-                    handleSignOut()
+                    setOpen(false);
+                    handleSignOut();
                   }}
                 >
                   Sign Out
@@ -138,5 +150,5 @@ export default function Navbar() {
         )}
       </AnimatePresence>
     </nav>
-  )
+  );
 }

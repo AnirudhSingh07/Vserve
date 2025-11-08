@@ -1,0 +1,10 @@
+{
+  "crons": [
+    {
+      "path": "/api/attendance/auto-checkout",
+     "schedule": "30 13 * * *"  
+
+    }
+  ]
+}
+

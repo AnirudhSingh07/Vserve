@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { connectDB } from "@/lib/db";
 import Employee from "@/models/employee";
 import bcrypt from "bcryptjs";
+import { signToken } from "@/lib/jwt"; // ✅ use your centralized JWT util
 
 export async function POST(req: Request) {
   try {
@@ -30,14 +31,31 @@ export async function POST(req: Request) {
     } = data;
 
     // Validation
-    if (!phone || !password || !name || !role || !fatherName || !panCard || !bankAccountNumber || !dateOfJoining || !addressProof || !idCardNumber) {
-      return NextResponse.json({ error: "All fields are required" }, { status: 400 });
+    if (
+      !phone ||
+      !password ||
+      !name ||
+      !role ||
+      !fatherName ||
+      !panCard ||
+      !bankAccountNumber ||
+      !dateOfJoining ||
+      !addressProof ||
+      !idCardNumber
+    ) {
+      return NextResponse.json(
+        { error: "All fields are required" },
+        { status: 400 }
+      );
     }
 
     // Check if phone already exists
     const existing = await Employee.findOne({ phone });
     if (existing) {
-      return NextResponse.json({ error: "Phone already registered" }, { status: 400 });
+      return NextResponse.json(
+        { error: "Phone already registered" },
+        { status: 400 }
+      );
     }
 
     // Hash password
@@ -57,12 +75,34 @@ export async function POST(req: Request) {
       idCardNumber,
     });
 
-    return NextResponse.json({
+    // ✅ Generate JWT using lib/jwt.ts
+    const token = signToken({ sub: employee._id, role: employee.role });
+
+    // ✅ Prepare JSON response
+    const response = NextResponse.json({
       success: true,
-      employee: { id: employee._id, phone: employee.phone, role: employee.role },
+      message: "Registration successful",
+      employee: {
+        id: employee._id,
+        phone: employee.phone,
+        role: employee.role,
+      },
     });
+
+    // ✅ Store JWT in secure HTTP-only cookie
+    response.cookies.set("token", token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "strict",
+      path: "/",
+    });
+
+    return response;
   } catch (err) {
-    console.error(err);
-    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
+    console.error("Registration error:", err);
+    return NextResponse.json(
+      { error: "Internal Server Error" },
+      { status: 500 }
+    );
   }
 }
