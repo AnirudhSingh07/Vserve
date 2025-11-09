@@ -10,6 +10,7 @@ import {
   Building2,
   Calendar,
   FileText,
+  ArrowLeft,
 } from "lucide-react";
 
 export default function ProfilePage() {
@@ -21,7 +22,7 @@ export default function ProfilePage() {
       try {
         const res = await fetch("/api/me");
         const data = await res.json();
-        if (res.ok) setUser(data.user || data); // handle both { user: {...} } and {...}
+        if (res.ok) setUser(data.user || data);
       } catch (err) {
         console.error("Failed to fetch user:", err);
       } finally {
@@ -53,7 +54,16 @@ export default function ProfilePage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 flex items-center justify-center p-6">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 flex flex-col items-center justify-center p-6">
+      {/* 🔙 Back Button */}
+      <button
+        onClick={() => window.history.back()}
+        className="absolute top-6 left-6 flex items-center text-indigo-600 hover:text-indigo-800 font-medium"
+      >
+        <ArrowLeft className="w-5 h-5 mr-1" />
+        Back
+      </button>
+
       <Card className="max-w-lg w-full shadow-lg bg-white border-t-4 border-indigo-500">
         <CardHeader className="text-center">
           <div className="bg-gradient-to-br from-indigo-500 to-purple-600 text-white rounded-full w-20 h-20 flex items-center justify-center font-bold text-2xl mx-auto shadow-md mb-3">

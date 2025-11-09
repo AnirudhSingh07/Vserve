@@ -3,7 +3,7 @@ import { connectDB } from "@/lib/db";
 import Employee from "@/models/employee";
 import Attendance from "@/models/attendance";
 import dayjs from "dayjs";
-import { cubicBezier } from "framer-motion";
+
 
 export async function POST(req: NextRequest) {
   try {
@@ -30,7 +30,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(
         {
           success: false,
-          error: "Check-in allowed only between 8:00 AM and 7:00 PM.",
+          error: "Check-in allowed only between 6:00 AM and 11:00 PM.",
         },
         { status: 403 }
       );
@@ -59,7 +59,7 @@ export async function POST(req: NextRequest) {
 
     attendance.checkInTime = now.toDate();
     attendance.checkInLocation = coords;
-    attendance.checkedIn = true; // optional flag if your model supports it
+    attendance.status = "on-time";
     await attendance.save();
 
     return NextResponse.json({ success: true, message: "Checked in successfully." });
