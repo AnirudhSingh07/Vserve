@@ -51,7 +51,7 @@ export async function POST(req: NextRequest) {
     }
 
     // ✅ Mark as absent if employee didn’t check in or out during the day
-    if (!attendance) {
+    if (!attendance && currentHour >= WORK_END_HOUR) {
       attendance = new Attendance({
         employee: employee._id,
         date: now.toDate(),

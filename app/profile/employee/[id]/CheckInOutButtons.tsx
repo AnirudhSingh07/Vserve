@@ -26,14 +26,28 @@ export default function CheckInOutButtons({ phone }: Props) {
 
       setLoading(true);
 
-      const res = await fetch(
-        `${process.env.NEXT_PUBLIC_BASE_URL}/api/attendance/${type}`,
-        {
+      if (type === "checkin") {
+        const state = hours > 9 ? "Late" : "On-time";
+        console.log("state from checkin button ", state);
+
+        const res = await fetch(`/api/attendance/${type}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ phone, coords: { lat: 0, lng: 0 }, state }),
+        });
+      } else {
+        const res = await fetch(`/api/attendance/${type}`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ phone, coords: { lat: 0, lng: 0 } }),
-        }
-      );
+        });
+      }
+
+      const res = await fetch(`/api/attendance/${type}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phone, coords: { lat: 0, lng: 0 } }),
+      });
       const data = await res.json();
       alert(data.message ?? data.error);
       location.reload();
