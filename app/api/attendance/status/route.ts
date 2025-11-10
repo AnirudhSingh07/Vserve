@@ -18,31 +18,55 @@ export async function POST(req: NextRequest) {
 
     const now = dayjs();
     const currentHour = now.hour();
-    const WORK_START_HOUR = 6;   // 8:00 AM
-    const WORK_END_HOUR = 23;    // 7:00 PM
+    const WORK_START_HOUR = 6;
+    const WORK_END_HOUR = 23;
 
     // ⛔ Access blocked outside allowed hours
     if (currentHour < WORK_START_HOUR || currentHour >= WORK_END_HOUR) {
       return NextResponse.json({
         success: false,
         accessDenied: true,
-        message: "Access restricted: system available between 8:00 AM and 7:00 PM only.",
       });
     }
 
     const today = now.startOf("day").toDate();
+    const tomorrow = now.endOf("day").toDate();
 
     let attendance = await Attendance.findOne({
       employee: employee._id,
-      date: { $gte: today },
+      date: { $gte: today, $lte: tomorrow },
     });
 
-    // ✅ Auto-checkout safeguard (if still checked in after 7 PM)
-    if (attendance && attendance.checkInTime && !attendance.checkOutTime && currentHour >= WORK_END_HOUR) {
+    // ✅ Auto-checkout safeguard (if still checked in after 11 PM)
+    if (
+      attendance &&
+      attendance.checkInTime &&
+      !attendance.checkOutTime &&
+      currentHour >= WORK_END_HOUR
+    ) {
       attendance.checkOutTime = now.toDate();
       attendance.checkOutLocation = { auto: true };
       attendance.checkedIn = false;
       await attendance.save();
+    }
+
+    // ✅ Mark as absent if employee didn’t check in or out during the day
+    if (!attendance && currentHour >= WORK_END_HOUR) {
+      attendance = new Attendance({
+        employee: employee._id,
+        date: now.toDate(),
+        status: "Absent",
+      });
+      await attendance.save();
+      console.log(
+        `📅 Marked ${employee.name} as Absent for ${now.format("YYYY-MM-DD")}`
+      );
+    } else if (!attendance.checkInTime && !attendance.checkOutTime) {
+      attendance.status = "Absent";
+      await attendance.save();
+      console.log(
+        `📅 Updated ${employee.name} as Absent for ${now.format("YYYY-MM-DD")}`
+      );
     }
 
     const checkedIn = !!(
@@ -55,6 +79,7 @@ export async function POST(req: NextRequest) {
       success: true,
       checkedIn,
       accessDenied: false,
+      status: attendance.status || "Absent",
     });
   } catch (err: any) {
     console.error("❌ Attendance status error:", err);

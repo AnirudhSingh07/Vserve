@@ -3,6 +3,7 @@ import mongoose, { Schema, models } from "mongoose";
 const AttendanceSchema = new Schema({
   employee: { type: Schema.Types.ObjectId, ref: "Employee", required: true },
   date: { type: Date, required: true },
+  status: String,
   checkInTime: Number,
   checkInLocation: {
     lat: Number,

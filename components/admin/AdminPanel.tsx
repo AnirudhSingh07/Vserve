@@ -3,7 +3,6 @@
 import AdminHeader from "../admin/AdminHeader";
 import EmployeeDirectory from "../admin/EmployeeDirectory";
 import AttendanceLogs from "../admin/AttendanceLogs";
-import LateRequests from "../admin/LateRequests";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -19,6 +18,9 @@ type User = {
 };
 
 type AttendanceRow = {
+  name: string;
+  fatherName: string;
+  idCardNumber: string;
   phone: string;
   date: string;
   status: string;
@@ -26,22 +28,11 @@ type AttendanceRow = {
   checkOut?: string;
 };
 
-type LateReq = {
-  id: string;
-  phone: string;
-  date: string;
-  reason: string;
-  status: "pending" | "approved" | "rejected";
-  remarks?: string;
-  createdAt: number;
-};
-
 export default function AdminPanel() {
   const router = useRouter();
   const [admin, setAdmin] = useState<User | null>(null);
   const [users, setUsers] = useState<User[]>([]);
   const [attRows, setAttRows] = useState<AttendanceRow[]>([]);
-  const [lateReqs, setLateReqs] = useState<LateReq[]>([]);
   const [search, setSearch] = useState("");
   const [expandedEmployeeId, setExpandedEmployeeId] = useState<string | null>(
     null
@@ -71,37 +62,48 @@ export default function AdminPanel() {
           credentials: "include",
         });
 
-        const lateRes = await fetch("/api/late-requests", {
-          credentials: "include",
-        });
         if (attRes.ok) {
           const data = await attRes.json();
           setAttRows(
-            (data.data || []).map((r: any) => ({
-              phone: r.phone,
-              date: r.date,
-              status:
-                r.status === "on-time"
-                  ? "On-time"
-                  : r.lateApproved
-                  ? "Late (Approved)"
-                  : r.status === "late"
-                  ? "Late"
-                  : "—",
-              checkIn: r.checkInTime
-                ? new Date(r.checkInTime).toLocaleTimeString()
-                : undefined,
-              checkOut: r.checkOutTime
-                ? new Date(r.checkOutTime).toLocaleTimeString()
-                : undefined,
-            }))
-          );
-          console.log("response from admin panel", attRows);
-        }
+            (data.data || []).map((r: any) => {
+              // Helper to format time safely only if it's a valid Date
+              const safeFormatTime = (time: any) => {
+                if (!time || time === "N/A") return undefined;
+                // If the API already sent "09:45 AM" or similar formatted string, return as-is
+                if (typeof time === "string" && /AM|PM/i.test(time))
+                  return time;
 
-        if (lateRes.ok) {
-          const data = await lateRes.json();
-          setLateReqs(data.requests || []);
+                // Otherwise, format raw Date value
+                const d = new Date(time);
+                return isNaN(d.getTime())
+                  ? undefined
+                  : d.toLocaleTimeString("en-US", {
+                      hour: "2-digit",
+                      minute: "2-digit",
+                      hour12: true,
+                    });
+              };
+
+              return {
+                name: r.name,
+                fatherName: r.fatherName,
+                idCardNumber: r.idCardNumber,
+                phone: r.phone,
+                date: r.date,
+                status:
+                  r.status === "on-time"
+                    ? "On-time"
+                    : r.lateApproved
+                    ? "Late (Approved)"
+                    : r.status === "late"
+                    ? "Late"
+                    : "—",
+                checkIn: safeFormatTime(r.checkInTime),
+                checkOut: safeFormatTime(r.checkOutTime),
+              };
+            })
+          );
+          console.log("✅ Processed Attendance Rows:", data.data);
         }
       } catch (err: any) {
         console.error(err);
@@ -127,10 +129,6 @@ export default function AdminPanel() {
         credentials: "include",
       });
       if (!res.ok) throw new Error("Failed to update late request");
-
-      setLateReqs((prev) =>
-        prev.map((r) => (r.id === id ? { ...r, status, remarks } : r))
-      );
     } catch (err: any) {
       console.error(err);
       alert("Error updating late request: " + err.message);
@@ -157,8 +155,6 @@ export default function AdminPanel() {
     a.click();
     URL.revokeObjectURL(url);
   };
-
-  const pendingLateReqs = lateReqs.filter((r) => r.status === "pending");
 
   const openUserProfile = (id: string) => {
     const user = users.find((u) => u._id === id);
@@ -199,19 +195,10 @@ export default function AdminPanel() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 p-4 md:p-8">
       <div className="max-w-7xl mx-auto space-y-6">
-        <AdminHeader
-          admin={admin}
-          users={users}
-          pendingLateReqs={pendingLateReqs}
-        />
+        <AdminHeader admin={admin} users={users} />
         <EmployeeDirectory users={users} />
 
         <AttendanceLogs attRows={attRows} downloadCSV={downloadCSV} />
-        <LateRequests
-          lateReqs={lateReqs}
-          pendingLateReqs={pendingLateReqs}
-          updateLate={updateLate}
-        />
       </div>
     </div>
   );

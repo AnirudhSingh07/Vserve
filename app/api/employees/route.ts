@@ -5,9 +5,15 @@ import Employee from "@/models/employee";
 export async function GET() {
   try {
     await connectDB();
-    const employees = await Employee.find({});
+
+    // ✅ Find all employees except those with role 'admin'
+    const employees = await Employee.find({ role: { $ne: "admin" } });
+
     return NextResponse.json({ success: true, employees });
   } catch (error: any) {
-    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+    return NextResponse.json(
+      { success: false, error: error.message },
+      { status: 500 }
+    );
   }
 }

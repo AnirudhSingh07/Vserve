@@ -3,12 +3,12 @@ import { connectDB } from "@/lib/db";
 import Employee from "@/models/employee";
 import Attendance from "@/models/attendance";
 import dayjs from "dayjs";
-import { cubicBezier } from "framer-motion";
+
 
 export async function POST(req: NextRequest) {
   try {
     await connectDB();
-    const { phone, coords } = await req.json();
+    const { phone, coords, state } = await req.json();
 
     if (!phone || !coords)
       return NextResponse.json({ success: false, error: "Missing data" });
@@ -18,8 +18,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, error: "Employee not found" });
 
     // ✅ Define working hours
-    const WORK_START_HOUR = 6;  // 8:00 AM
-    const WORK_END_HOUR = 23;   // 7:00 PM (24-hour format)
+    const WORK_START_HOUR = 6; // 8:00 AM
+    const WORK_END_HOUR = 23; // 7:00 PM (24-hour format)
 
     // ✅ Check current time
     const now = dayjs();
@@ -30,7 +30,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(
         {
           success: false,
-          error: "Check-in allowed only between 8:00 AM and 7:00 PM.",
+          error: "Check-in allowed only between 6:00 AM and 11:00 PM.",
         },
         { status: 403 }
       );
@@ -59,10 +59,17 @@ export async function POST(req: NextRequest) {
 
     attendance.checkInTime = now.toDate();
     attendance.checkInLocation = coords;
-    attendance.checkedIn = true; // optional flag if your model supports it
+    if (state.length > 0) {
+      attendance.status = state;
+    } else {
+      attendance.status = "On-time";
+    }
     await attendance.save();
 
-    return NextResponse.json({ success: true, message: "Checked in successfully." });
+    return NextResponse.json({
+      success: true,
+      message: "Checked in successfully.",
+    });
   } catch (err: any) {
     console.error("❌ Check-in error:", err);
     return NextResponse.json(

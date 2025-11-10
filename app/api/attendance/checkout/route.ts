@@ -28,18 +28,7 @@ export async function POST(req: NextRequest) {
       date: { $gte: today },
     });
 
-    if (!attendance?.checkInTime)
-      return NextResponse.json({
-        success: false,
-        error: "No check-in found for today",
-      });
-
-    if (attendance.checkOutTime)
-      return NextResponse.json({
-        success: false,
-        error: "Already checked out today",
-      });
-
+   
 
     // ❌ Prevent manual checkout before 8 AM (optional)
     if (currentHour < WORK_START_HOUR) {
@@ -55,7 +44,7 @@ export async function POST(req: NextRequest) {
     // ✅ Normal manual checkout (within hours)
     attendance.checkOutTime = now.toDate();
     attendance.checkOutLocation = coords;
-    attendance.checkedIn = false;
+    
     await attendance.save();
 
     return NextResponse.json({
