@@ -8,6 +8,7 @@ import {
   Marker,
   Polyline,
 } from "@react-google-maps/api";
+import { Geolocation } from "@capacitor/geolocation"; // ✅ Added Capacitor import
 import Navbar from "@/components/Navbar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
@@ -32,7 +33,6 @@ const haversineMeters = (coords1: any, coords2: any) => {
 // Google Maps Libraries
 const libraries: "places"[] = ["places"];
 
-// Types
 type UserData = {
   id: string;
   name: string;
@@ -53,14 +53,13 @@ export default function DashboardPage() {
 
   const mapRef = useRef<google.maps.Map | null>(null);
 
-  // ✅ Load Google Maps API
   const { isLoaded } = useJsApiLoader({
     id: "google-map-script",
     googleMapsApiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || "",
     libraries,
   });
 
-  // ✅ Fetch Logged-in User + Attendance Status
+  // ✅ Fetch user info and attendance
   useEffect(() => {
     const fetchUser = async () => {
       try {
@@ -76,7 +75,6 @@ export default function DashboardPage() {
           role: data.user.role,
         });
 
-        // 👇 Fetch attendance status (with access time restriction)
         const attRes = await fetch("/api/attendance/status", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -103,26 +101,52 @@ export default function DashboardPage() {
     fetchUser();
   }, []);
 
-  // ✅ Track live location
+  // ✅ Universal Location Watcher (Web + Android)
   useEffect(() => {
-    if (!navigator.geolocation) {
-      setError("Geolocation not supported.");
-      return;
-    }
+    let watchId: number | string | null = null;
 
-    const watchId = navigator.geolocation.watchPosition(
-      (pos) => {
-        const c = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-        setCoords(c);
-        setInside(haversineMeters(c, OFFICE_CENTER) <= OFFICE_RADIUS_METERS);
-        if (checkedIn) setPath((p) => [...p, [c.lat, c.lng]]);
-        if (mapRef.current) mapRef.current.panTo(c);
-      },
-      (err) => setError(err.message),
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
-    );
+    const startTracking = async () => {
+      try {
+        // Ask permission (works on both web and native)
+        const perm = await Geolocation.requestPermissions();
+        if (perm.location !== "granted") {
+          setError("Location permission not granted");
+          return;
+        }
 
-    return () => navigator.geolocation.clearWatch(watchId);
+        // Use Capacitor's native watcher (automatically works on web too)
+        watchId = await Geolocation.watchPosition(
+          { enableHighAccuracy: true },
+          (position, err) => {
+            if (err) {
+              console.error("Error watching position:", err);
+              setError("Error getting location");
+              return;
+            }
+            if (!position) return;
+
+            const c = {
+              lat: position.coords.latitude,
+              lng: position.coords.longitude,
+            };
+
+            setCoords(c);
+            setInside(haversineMeters(c, OFFICE_CENTER) <= OFFICE_RADIUS_METERS);
+            if (checkedIn) setPath((p) => [...p, [c.lat, c.lng]]);
+            if (mapRef.current) mapRef.current.panTo(c);
+          }
+        );
+      } catch (err) {
+        console.error(err);
+        setError("Failed to start location tracking");
+      }
+    };
+
+    startTracking();
+
+    return () => {
+      if (watchId) Geolocation.clearWatch({ id: String(watchId) });
+    };
   }, [checkedIn]);
 
   const canCheckIn = useMemo(() => inside && !checkedIn, [inside, checkedIn]);
@@ -242,7 +266,7 @@ export default function DashboardPage() {
           {(() => {
             const now = new Date();
             const hour = now.getHours();
-            const withinTime = hour >= 6 && hour < 23; // 8 AM - 7 PM
+            const withinTime = hour >= 6 && hour < 23;
 
             if (!withinTime) {
               return (
