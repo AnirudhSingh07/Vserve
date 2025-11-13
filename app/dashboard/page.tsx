@@ -13,7 +13,7 @@ import Navbar from "@/components/Navbar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 // Constants
-const OFFICE_CENTER = { lat: 22.99793312024704, lng: 76.06059952886626 };
+const OFFICE_CENTER = { lat: 23.1575, lng: 75.7997  };
 const OFFICE_RADIUS_METERS = 2000;
 
 // Utilities
@@ -145,7 +145,7 @@ export default function DashboardPage() {
     startTracking();
 
     return () => {
-      if (watchId) Geolocation.clearWatch({ id: String(watchId) });
+      if (watchId) Geolocation.clearWatch({ id:String(watchId)  });
     };
   }, [checkedIn]);
 
