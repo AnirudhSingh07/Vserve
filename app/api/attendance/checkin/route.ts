@@ -3,7 +3,11 @@ import { connectDB } from "@/lib/db";
 import Employee from "@/models/employee";
 import Attendance from "@/models/attendance";
 import dayjs from "dayjs";
-import { cubicBezier } from "framer-motion";
+import utc from "dayjs/plugin/utc";
+import timezone from "dayjs/plugin/timezone";
+
+dayjs.extend(utc);
+dayjs.extend(timezone);
 
 export async function POST(req: NextRequest) {
   try {
@@ -17,14 +21,14 @@ export async function POST(req: NextRequest) {
     if (!employee)
       return NextResponse.json({ success: false, error: "Employee not found" });
 
-    // ✅ Define working hours
-    const WORK_START_HOUR = 6;  // 8:00 AM
-    const WORK_END_HOUR = 23;   // 7:00 PM (24-hour format)
+    // ✅ Correct working hours (8 AM to 7 PM)
+    const WORK_START_HOUR = 8;  
+    const WORK_END_HOUR = 19;   
 
-    // ✅ Check current time
-    const now = dayjs();
+    // ✅ Use IST timezone
+    const now = dayjs().tz("Asia/Kolkata");
     const currentHour = now.hour();
-    console.log("current hours from checkin ", currentHour);
+    console.log("current hours from checkin (IST): ", currentHour);
 
     if (currentHour < WORK_START_HOUR || currentHour >= WORK_END_HOUR) {
       return NextResponse.json(
@@ -59,7 +63,7 @@ export async function POST(req: NextRequest) {
 
     attendance.checkInTime = now.toDate();
     attendance.checkInLocation = coords;
-    attendance.checkedIn = true; // optional flag if your model supports it
+    attendance.checkedIn = true;
     await attendance.save();
 
     return NextResponse.json({ success: true, message: "Checked in successfully." });

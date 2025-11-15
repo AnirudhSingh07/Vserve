@@ -3,33 +3,42 @@ import { connectDB } from "@/lib/db";
 import Attendance from "@/models/attendance";
 import Employee from "@/models/employee";
 
+// 🚀 Disable ALL caching (Vercel + Next.js + CDN)
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+export const fetchCache = "force-no-store";
+
 export async function GET(req: NextRequest) {
   try {
     await connectDB();
-    console.log("📡 [API] /api/attendance/allattendance called");
+    console.log("📡 [API] /api/allattendance called");
 
-    // ✅ Fetch all attendance records and populate employee details
+    // Fetch data fresh every time
     const records = await Attendance.find()
       .populate("employee", "name phone email role department")
       .sort({ date: -1 });
 
-    console.log("📋 [API] Attendance records fetched:", records.length);
+    console.log("📋 Total attendance records:", records.length);
 
     if (!records || records.length === 0) {
-      console.warn("⚠️ No attendance records found in DB");
-      return NextResponse.json({
-        success: true,
-        message: "No attendance records found",
-        data: [],
-      });
+      return NextResponse.json(
+        {
+          success: true,
+          message: "No attendance records found",
+          data: [],
+        },
+        {
+          status: 200,
+          headers: {
+            "Cache-Control":
+              "no-store, no-cache, must-revalidate, proxy-revalidate",
+          },
+        }
+      );
     }
 
-    // 🔍 Log a few sample records to verify data structure
-    console.log("🧾 Sample record[0]:", JSON.stringify(records[0], null, 2));
-
-    // ✅ Ensure phone and employee info are correctly extracted
     const data = records.map((r) => ({
-      phone: r.employee?.phone ?? "N/A", // fix: phone comes from populated employee
+      phone: r.employee?.phone ?? "N/A",
       name: r.employee?.name ?? "Unknown",
       email: r.employee?.email ?? "Unknown",
       department: r.employee?.department ?? "N/A",
@@ -40,18 +49,32 @@ export async function GET(req: NextRequest) {
       lateApproved: r.lateApproved ?? false,
     }));
 
-    console.log("✅ [API] Processed attendance data count:", data.length);
+    console.log("✅ Processed attendance:", data.length);
 
-    return NextResponse.json({
-      success: true,
-      count: data.length,
-      data,
-    });
+    return NextResponse.json(
+      {
+        success: true,
+        count: data.length,
+        data,
+      },
+      {
+        status: 200,
+        headers: {
+          "Cache-Control":
+            "no-store, no-cache, must-revalidate, proxy-revalidate",
+        },
+      }
+    );
   } catch (err: any) {
-    console.error("❌ [API] Error fetching all attendance:", err);
+    console.error("❌ Error fetching attendance:", err);
     return NextResponse.json(
       { success: false, error: "Server error while fetching attendance" },
-      { status: 500 }
+      {
+        status: 500,
+        headers: {
+          "Cache-Control": "no-store",
+        },
+      }
     );
   }
 }
