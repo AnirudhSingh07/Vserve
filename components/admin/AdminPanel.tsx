@@ -20,6 +20,7 @@ type User = {
 
 type AttendanceRow = {
   phone: string;
+  name: string;
   date: string;
   status: string;
   checkIn?: string;
@@ -76,9 +77,11 @@ export default function AdminPanel() {
         });
         if (attRes.ok) {
           const data = await attRes.json();
+          console.log("attendance data", data);
           setAttRows(
             (data.data || []).map((r: any) => ({
               phone: r.phone,
+              name : r.name,
               date: r.date,
               status:
                 r.status === "on-time"

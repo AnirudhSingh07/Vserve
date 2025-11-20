@@ -5,6 +5,7 @@ import { Clock, Download, Phone, Calendar, CheckCircle, AlertCircle } from "luci
 type AttendanceRow = {
   phone: string;
   date: string;
+  name: string;
   status: string;
   checkIn?: string;
   checkOut?: string;
@@ -16,6 +17,19 @@ interface AttendanceLogsProps {
 }
 
 export default function AttendanceLogs({ attRows, downloadCSV }: AttendanceLogsProps) {
+
+  function extractDate(input : string) {
+  const date = new Date(input);
+  if (isNaN(date.getTime())) {
+    throw new Error("Invalid date string");
+  }
+  const day = String(date.getUTCDate()).padStart(2, "0");
+  const month = String(date.getUTCMonth() + 1).padStart(2, "0");
+  const year = date.getUTCFullYear();
+
+  return `${day}/${month}/${year}`;
+  }
+
   console.log(attRows);
 
   return (
@@ -49,6 +63,9 @@ export default function AttendanceLogs({ attRows, downloadCSV }: AttendanceLogsP
             <thead className="bg-gray-50">
               <tr>
                 <th className="px-3 sm:px-4 py-2 sm:py-3 text-left text-xs sm:text-sm font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
+                  Name
+                </th>
+                <th className="px-3 sm:px-4 py-2 sm:py-3 text-left text-xs sm:text-sm font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
                   <Phone className="inline w-4 h-4 mr-1" /> Phone
                 </th>
                 <th className="px-3 sm:px-4 py-2 sm:py-3 text-left text-xs sm:text-sm font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
@@ -68,21 +85,38 @@ export default function AttendanceLogs({ attRows, downloadCSV }: AttendanceLogsP
             <tbody className="bg-white divide-y divide-gray-200">
               {attRows.map((row, index) => (
                 <tr key={index} className="hover:bg-gray-50 transition-colors">
+                  <td className="px-3 sm:px-4 py-2 text-gray-700 whitespace-nowrap">{row.name}</td>
                   <td className="px-3 sm:px-4 py-2 text-gray-700 whitespace-nowrap">{row.phone}</td>
-                  <td className="px-3 sm:px-4 py-2 text-gray-700 whitespace-nowrap">{row.date}</td>
+                  <td className="px-3 sm:px-4 py-2 text-gray-700 whitespace-nowrap">{extractDate(row.date)}</td>
                   <td className="px-3 sm:px-4 py-2">
-                    {row.status === "On-time" ? (
-                      <span className="flex items-center text-green-600 whitespace-nowrap">
-                        <CheckCircle className="w-4 h-4 mr-1" /> {row.status}
-                      </span>
-                    ) : row.status.includes("Late") ? (
-                      <span className="flex items-center text-orange-600 whitespace-nowrap">
-                        <AlertCircle className="w-4 h-4 mr-1" /> {row.status}
-                      </span>
-                    ) : (
-                      <span className="text-gray-400 whitespace-nowrap">{row.status}</span>
-                    )}
-                  </td>
+  {(() => {
+    if (!row.checkIn) {
+      return <span className="text-gray-400 whitespace-nowrap">--</span>;
+    }
+
+    // Compare times using string comparison (valid for HH:MM:SS)
+    const checkIn = row.checkIn; 
+    const isOnTime = checkIn >= "09:00:00" && checkIn <= "10:00:00";
+    const isLate = checkIn > "10:00:00";
+
+    let status = "Early";
+    if (isOnTime) status = "On-time";
+    else if (isLate) status = "Late";
+
+    return status === "On-time" ? (
+      <span className="flex items-center text-green-600 whitespace-nowrap">
+        <CheckCircle className="w-4 h-4 mr-1" /> {status}
+      </span>
+    ) : status === "Late" ? (
+      <span className="flex items-center text-orange-600 whitespace-nowrap">
+        <AlertCircle className="w-4 h-4 mr-1" /> {status}
+      </span>
+    ) : (
+      <span className="text-gray-400 whitespace-nowrap">{status}</span>
+    );
+  })()}
+</td>
+
                   <td className="px-3 sm:px-4 py-2 text-gray-700 whitespace-nowrap">{row.checkIn || "—"}</td>
                   <td className="px-3 sm:px-4 py-2 text-gray-700 whitespace-nowrap">{row.checkOut || "—"}</td>
                 </tr>
