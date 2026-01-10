@@ -763,7 +763,8 @@ const SentLocation = ({ params }: { params: { empphone: string } }) => {
                         <Clock className="h-6 w-6" />
                       </div>
                       <p className="text-2xl font-bold text-slate-900">
-                        {new Date(item.date).toLocaleTimeString([], {
+                        {new Date(item.date).toLocaleTimeString("en-IN", {
+                          timeZone: "Asia/Kolkata",
                           hour: "2-digit",
                           minute: "2-digit",
                         })}

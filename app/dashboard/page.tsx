@@ -54,8 +54,8 @@ export default function DashboardPage() {
   const [show, setShow] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const WORK_START_HOUR = 0; // 9:00 AM
-  const WORK_END_HOUR = 24; // 6:00 PM
+  const WORK_START_HOUR = 9; // 9:00 AM
+  const WORK_END_HOUR = 18; // 6:00 PM
 
   const mapRef = useRef<google.maps.Map | null>(null);
 
@@ -389,8 +389,8 @@ export default function DashboardPage() {
               // }
             })()}
 
-            {
-              (checkedIn && (<button
+            {checkedIn && (
+              <button
                 onClick={handleCheckOut}
                 disabled={!inside}
                 className={`px-6 py-3 rounded-full text-sm font-medium text-white transition ${
@@ -400,8 +400,8 @@ export default function DashboardPage() {
                 }`}
               >
                 Check Out
-              </button>))
-            }
+              </button>
+            )}
 
             {show && (
               <button
