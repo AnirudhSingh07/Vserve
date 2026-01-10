@@ -388,7 +388,7 @@ export default function DashboardPage() {
               );
             })()}
 
-            {show && checkedIn && (
+            {show  && (
               <button
                 onClick={handleSendLocation}
                 className="px-6 py-3 rounded-full text-sm font-medium bg-green-600 hover:bg-green-700 text-white transition"
