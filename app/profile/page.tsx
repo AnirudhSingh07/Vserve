@@ -8,6 +8,8 @@ import {
   CreditCard,
   Building2,
   Calendar,
+  LocateIcon,
+  BadgeCheckIcon,
   FileText,
   Loader2,
 } from "lucide-react";
@@ -117,21 +119,118 @@ export default function ProfilePage() {
                   : "N/A"
               }
             />
+            {user.role === "executive" && (
+              <ProfileItem
+                icon={<LocateIcon className="w-4 h-4" />}
+                label="Location"
+                value={user.location ? user.location : "N/A"}
+              />
+            )}
+            {user.role === "executive" && (
+              <ProfileItem
+                icon={<BadgeCheckIcon className="w-4 h-4" />}
+                label="Department"
+                value={user.department ? user.department : "N/A"}
+              />
+            )}
+            {user.role === "executive" && (
+              <ProfileItem
+                icon={<BadgeCheckIcon className="w-4 h-4" />}
+                label="Address :"
+                value={user.addressProof ? user.addressProof : "N/A"}
+              />
+            )}
           </div>
 
-          {/* Address Proof */}
-          {user.addressProof && user.role === "executive" && (
-            <a
-              href={user.addressProof}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center justify-center gap-2 bg-blue-500 text-white py-3 rounded-xl text-sm font-medium border-2 border-black shadow-[3px_5px_0px_0px_rgba(0,0,0,1)] hover:bg-blue-600
-             hover:translate-y-1 hover:shadow-none
-              hover:opacity-90 transition-all"
+          {user.role === "executive" && (
+            <form
+              onSubmit={async (e) => {
+                e.preventDefault();
+                const formData = new FormData(e.currentTarget);
+                console.log("Updating location...");
+                const location = formData.get("location");
+                console.log("Location:", location);
+                if (location) {
+                  const res = await fetch("/api/update-location", {
+                    method: "POST",
+                    body: JSON.stringify({ location, id: user._id }),
+                    headers: {
+                      "Content-Type": "application/json",
+                    },
+                  });
+                  if (res.ok) {
+                    const data = await res.json();
+                    console.log("Location updated:", data);
+                    alert("Location updated successfully!");
+                  } else {
+                    console.error("Failed to update location:", res.statusText);
+                  }
+                }
+              }}
+              className="mt-4 flex flex-wrap items-center gap-4"
             >
-              <FileText className="w-4 h-4" />
-              View Address Proof
-            </a>
+              <select
+                name="location"
+                id="location"
+                className="w-48 px-3 py-2 text-sm font-normal border border-gray-300 rounded-lg bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
+              >
+                <option value="Indore">Indore</option>
+                <option value="Bhopal">Bhopal</option>
+              </select>
+
+              <button
+                type="submit"
+                className="px-4 py-2 text-sm font-medium bg-green-500 text-white rounded-lg hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-green-500 transition"
+              >
+                Update Location
+              </button>
+            </form>
+          )}
+
+          {user.role === "executive" && (
+            <div className=" mt-4">
+              <form
+                onSubmit={async (e) => {
+                  e.preventDefault();
+                  const formData = new FormData(e.currentTarget);
+                  const department = formData.get("department");
+                  if (department) {
+                    const res = await fetch("/api/update-department", {
+                      method: "POST",
+                      body: JSON.stringify({ department, id: user._id }),
+                      headers: {
+                        "Content-Type": "application/json",
+                      },
+                    });
+                    if (res.ok) {
+                      alert("Department updated successfully!");
+                      console.log("Department updated");
+                    } else {
+                      console.error(
+                        "Failed to update department:",
+                        res.statusText,
+                      );
+                    }
+                  }
+                }}
+                className="flex flex-wrap text-lg font-light items-center gap-4"
+              >
+                <label
+                  htmlFor="department"
+                  className="w-48 px-3 py-2 text-sm font-norma  border border-gray-300 rounded-lg bg-white text-gray-70l"
+                >
+                  Department
+                </label>
+                <input type="text" name="department" id="department" />
+
+                <button
+                  type="submit"
+                  className="px-12 py-2 text-sm font-medium bg-blue-500 text-white rounded-lg hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
+                >
+                  Submit
+                </button>
+              </form>
+            </div>
           )}
         </div>
       </div>

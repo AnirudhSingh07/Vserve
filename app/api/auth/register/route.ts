@@ -27,7 +27,8 @@ export async function POST(req: Request) {
       bankAccountNumber,
       dateOfJoining,
       addressProof,
-      idCardNumber,
+      department,
+      location,
     } = data;
 
     // Validation
@@ -40,12 +41,13 @@ export async function POST(req: Request) {
       !panCard ||
       !bankAccountNumber ||
       !dateOfJoining ||
+      !department ||
       !addressProof ||
-      !idCardNumber
+      !location
     ) {
       return NextResponse.json(
         { error: "All fields are required" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -54,7 +56,7 @@ export async function POST(req: Request) {
     if (existing) {
       return NextResponse.json(
         { error: "Phone already registered" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -71,8 +73,9 @@ export async function POST(req: Request) {
       panCard,
       bankAccountNumber,
       dateOfJoining: new Date(dateOfJoining),
+      location,
+      department,
       addressProof,
-      idCardNumber,
     });
 
     // ✅ Generate JWT using lib/jwt.ts
@@ -102,7 +105,7 @@ export async function POST(req: Request) {
     console.error("Registration error:", err);
     return NextResponse.json(
       { error: "Internal Server Error" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

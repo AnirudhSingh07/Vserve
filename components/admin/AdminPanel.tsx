@@ -113,28 +113,28 @@ export default function AdminPanel() {
     fetchData();
   }, []);
 
-  const updateLate = async (
-    id: string,
-    status: "approved" | "rejected",
-    remarks: string
-  ) => {
-    try {
-      const res = await fetch(`/api/late-requests/${id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status, remarks }),
-        credentials: "include",
-      });
-      if (!res.ok) throw new Error("Failed to update late request");
+  // const updateLate = async (
+  //   id: string,
+  //   status: "approved" | "rejected",
+  //   remarks: string
+  // ) => {
+  //   try {
+  //     const res = await fetch(`/api/late-requests/${id}`, {
+  //       method: "PATCH",
+  //       headers: { "Content-Type": "application/json" },
+  //       body: JSON.stringify({ status, remarks }),
+  //       credentials: "include",
+  //     });
+  //     if (!res.ok) throw new Error("Failed to update late request");
 
-      setLateReqs((prev) =>
-        prev.map((r) => (r.id === id ? { ...r, status, remarks } : r))
-      );
-    } catch (err: any) {
-      console.error(err);
-      alert("Error updating late request: " + err.message);
-    }
-  };
+  //     setLateReqs((prev) =>
+  //       prev.map((r) => (r.id === id ? { ...r, status, remarks } : r))
+  //     );
+  //   } catch (err: any) {
+  //     console.error(err);
+  //     alert("Error updating late request: " + err.message);
+  //   }
+  // };
 
   const downloadCSV = () => {
     const header = ["Phone", "Date", "Status", "Check-in", "Check-out"];
@@ -157,18 +157,15 @@ export default function AdminPanel() {
     URL.revokeObjectURL(url);
   };
 
-  const pendingLateReqs = lateReqs.filter((r) => r.status === "pending");
-
-  const openUserProfile = (id: string) => {
-    const user = users.find((u) => u._id === id);
-    
-    if (!user) return alert("User not found");
-    router.push(`/profile/employee/${user._id}`);
+  const handleEmployeeClick = () => {
+    router.push("/admin/employee");
   };
 
-  const toggleEmployeeExpand = (id: string) => {
-    setExpandedEmployeeId((prev) => (prev === id ? null : id));
-  };
+  // const pendingLateReqs = lateReqs.filter((r) => r.status === "pending");
+
+  // const toggleEmployeeExpand = (id: string) => {
+  //   setExpandedEmployeeId((prev) => (prev === id ? null : id));
+  // };
 
   if (loading)
     return (
@@ -198,8 +195,15 @@ export default function AdminPanel() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 p-4 md:p-8">
       <div className="max-w-7xl mx-auto space-y-6">
-        <EmployeeDirectory users={users} />
-
+        <div className="flex justify-start ">
+          <button
+            onClick={handleEmployeeClick}
+            className="bg-blue-500 hover:bg-blue-600 text-white font-medium py-2 px-2 rounded"
+          >
+            {" "}
+            Employee Directory{" "}
+          </button>
+        </div>
         <AttendanceLogs attRows={attRows} downloadCSV={downloadCSV} />
         {/* <LateRequests
           lateReqs={lateReqs}

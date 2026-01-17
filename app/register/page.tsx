@@ -6,7 +6,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import Image from "next/image";
 
 export default function Register() {
@@ -21,8 +27,9 @@ export default function Register() {
     panCard: "",
     bankAccountNumber: "",
     dateOfJoining: "",
+    location: "",
+    department: "",
     addressProof: "",
-    idCardNumber: "",
   });
 
   const [loading, setLoading] = useState(false);
@@ -47,14 +54,27 @@ export default function Register() {
       setError("Password must be at least 4 characters");
       return;
     }
-    if (!formData.name || !formData.fatherName || !formData.phone || !formData.password || !formData.role) {
+    if (
+      !formData.name ||
+      !formData.fatherName ||
+      !formData.phone ||
+      !formData.password ||
+      !formData.role
+    ) {
       setError("All fields in Basic Details are required");
       return;
     }
 
     if (step === 2) {
       // Additional Details Validations
-      if (!formData.panCard || !formData.bankAccountNumber || !formData.dateOfJoining || !formData.addressProof || !formData.idCardNumber) {
+      if (
+        !formData.panCard ||
+        !formData.bankAccountNumber ||
+        !formData.dateOfJoining ||
+        !formData.addressProof ||
+        !formData.location ||
+        !formData.department
+      ) {
         setError("All fields in Additional Details are required");
         return;
       }
@@ -84,7 +104,13 @@ export default function Register() {
   const handleNext = () => {
     if (step === 1) {
       // Validate basic details before moving to step 2
-      if (!formData.name || !formData.fatherName || !formData.phone || !formData.password || !formData.role) {
+      if (
+        !formData.name ||
+        !formData.fatherName ||
+        !formData.phone ||
+        !formData.password ||
+        !formData.role
+      ) {
         setError("Please fill all fields in Basic Details");
       } else {
         setStep(2); // Move to next step
@@ -102,9 +128,17 @@ export default function Register() {
     <Card className="border max-w-md mx-auto mt-10">
       <CardHeader className="space-y-3">
         <div className="flex items-center justify-center">
-          <Image src="/images/logo.png" alt="Company Logo" width={125} height={80} className="rounded-md" />
+          <Image
+            src="/images/logo.png"
+            alt="Company Logo"
+            width={125}
+            height={80}
+            className="rounded-md"
+          />
         </div>
-        <CardTitle className="text-center text-balance">Register New Employee</CardTitle>
+        <CardTitle className="text-center text-balance">
+          Register New Employee
+        </CardTitle>
       </CardHeader>
 
       <CardContent className="space-y-4 ">
@@ -114,13 +148,23 @@ export default function Register() {
             {/* Full Name */}
             <div className="grid gap-2">
               <Label htmlFor="name">Full Name</Label>
-              <Input id="name" placeholder="Enter full name" value={formData.name} onChange={(e) => handleChange("name", e.target.value)} />
+              <Input
+                id="name"
+                placeholder="Enter full name"
+                value={formData.name}
+                onChange={(e) => handleChange("name", e.target.value)}
+              />
             </div>
 
             {/* Father's Name */}
             <div className="grid gap-2">
               <Label htmlFor="fatherName">Father's Name</Label>
-              <Input id="fatherName" placeholder="Enter father's name" value={formData.fatherName} onChange={(e) => handleChange("fatherName", e.target.value)} />
+              <Input
+                id="fatherName"
+                placeholder="Enter father's name"
+                value={formData.fatherName}
+                onChange={(e) => handleChange("fatherName", e.target.value)}
+              />
             </div>
 
             {/* Phone */}
@@ -132,16 +176,23 @@ export default function Register() {
                 maxLength={10}
                 placeholder="Enter 10-digit number"
                 value={formData.phone}
-                onChange={(e) => handleChange("phone", e.target.value.replace(/\D/g, ""))}
+                onChange={(e) =>
+                  handleChange("phone", e.target.value.replace(/\D/g, ""))
+                }
               />
             </div>
 
             {/* Password */}
             <div className="grid gap-2">
               <Label htmlFor="password">Password</Label>
-              <Input id="password" type="password" placeholder="Enter password" value={formData.password} onChange={(e) => handleChange("password", e.target.value)} />
+              <Input
+                id="password"
+                type="password"
+                placeholder="Enter password"
+                value={formData.password}
+                onChange={(e) => handleChange("password", e.target.value)}
+              />
             </div>
-
           </>
         )}
 
@@ -151,31 +202,75 @@ export default function Register() {
             {/* PAN Card */}
             <div className="grid gap-2">
               <Label htmlFor="panCard">PAN Card Number</Label>
-              <Input id="panCard" placeholder="Enter PAN Card" value={formData.panCard} onChange={(e) => handleChange("panCard", e.target.value)} />
+              <Input
+                id="panCard"
+                placeholder="Enter PAN Card"
+                value={formData.panCard}
+                onChange={(e) => handleChange("panCard", e.target.value)}
+              />
             </div>
-
             {/* Bank Account */}
             <div className="grid gap-2">
               <Label htmlFor="bankAccountNumber">Bank Account Number</Label>
-              <Input id="bankAccountNumber" placeholder="Enter Bank Account" value={formData.bankAccountNumber} onChange={(e) => handleChange("bankAccountNumber", e.target.value)} />
+              <Input
+                id="bankAccountNumber"
+                placeholder="Enter Bank Account"
+                value={formData.bankAccountNumber}
+                onChange={(e) =>
+                  handleChange("bankAccountNumber", e.target.value)
+                }
+              />
             </div>
-
             {/* Date of Joining */}
             <div className="grid gap-2">
               <Label htmlFor="dateOfJoining">Date of Joining</Label>
-              <Input id="dateOfJoining" type="date" value={formData.dateOfJoining} onChange={(e) => handleChange("dateOfJoining", e.target.value)} />
+              <Input
+                id="dateOfJoining"
+                type="date"
+                value={formData.dateOfJoining}
+                onChange={(e) => handleChange("dateOfJoining", e.target.value)}
+              />
             </div>
-
             {/* Address Proof */}
             <div className="grid gap-2">
               <Label htmlFor="addressProof">Address Proof (URL)</Label>
-              <Input id="addressProof" placeholder="Enter address proof URL" value={formData.addressProof} onChange={(e) => handleChange("addressProof", e.target.value)} />
+              <Input
+                id="addressProof"
+                placeholder="Enter address proof URL"
+                value={formData.addressProof}
+                onChange={(e) => handleChange("addressProof", e.target.value)}
+              />
+            </div>
+            {/* department */}
+            <div className="grid gap-2">
+              <Label htmlFor="department">Department</Label>
+              <input
+                type="text"
+                placeholder="Enter department"
+                value={formData.department}
+                name="department"
+                id="department"
+                onChange={(e) => handleChange("department", e.target.value)}
+              />
             </div>
 
-            {/* ID Card Number */}
+            {/* location */}
             <div className="grid gap-2">
-              <Label htmlFor="idCardNumber">ID Card Number</Label>
-              <Input id="idCardNumber" placeholder="Enter ID Card Number" value={formData.idCardNumber} onChange={(e) => handleChange("idCardNumber", e.target.value)} />
+              <Label htmlFor="location">Location</Label>
+              <Select
+                value={formData.location}
+                onValueChange={(value) => handleChange("location", value)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select location">
+                    {formData.location || "Indore"}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Indore">Indore</SelectItem>
+                  <SelectItem value="Bhopal">Bhopal</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           </>
         )}

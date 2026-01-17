@@ -45,7 +45,7 @@ type UserData = {
 
 export default function DashboardPage() {
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(
-    null
+    null,
   );
   const [inside, setInside] = useState(false);
   const [checkedIn, setCheckedIn] = useState(false);
@@ -92,7 +92,7 @@ export default function DashboardPage() {
         if (attData.accessDenied) {
           alert(
             attData.message ||
-              "Access restricted: You can only check in between 8:00 AM and 7:00 PM."
+              "Access restricted: You can only check in between 8:00 AM and 7:00 PM.",
           );
           setCheckedIn(false);
         } else if (attData.success && attData.checkedIn) {
@@ -144,7 +144,7 @@ export default function DashboardPage() {
             setInside(insideIndore || insideBhopal);
             if (checkedIn) setPath((p) => [...p, [c.lat, c.lng]]);
             if (mapRef.current) mapRef.current.panTo(c);
-          }
+          },
         );
       } catch (err) {
         console.error(err);
@@ -213,6 +213,24 @@ export default function DashboardPage() {
     }
 
     try {
+      // ✅ NEW: run check-in once if not already checked in
+      if (!checkedIn) {
+        const checkinRes = await fetch("/api/attendance/checkin", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ phone: userData.phone, coords }),
+        });
+        const checkinData = await checkinRes.json();
+
+        if (!checkinData.success) {
+          throw new Error(checkinData.error || "Auto check-in failed");
+        }
+
+        setCheckedIn(true);
+        setPath([]);
+      }
+
+      // ✅ existing send location logic (unchanged)
       const res = await fetch("/api/attendance/sentloc", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -222,7 +240,7 @@ export default function DashboardPage() {
         }),
       });
 
-      const text = await res.text(); // 👈 read raw response first
+      const text = await res.text();
 
       if (!text) {
         throw new Error("Empty response from server");
@@ -403,14 +421,25 @@ export default function DashboardPage() {
               </button>
             )}
 
-            {show && (
-              <button
-                onClick={handleSendLocation}
-                className="px-6 py-3 rounded-full text-sm font-medium bg-green-600 hover:bg-green-700 text-white transition"
-              >
-                Send Location
-              </button>
-            )}
+            {(() => {
+              const now = new Date();
+              const hour = now.getHours();
+              const withinTime =
+                hour >= WORK_START_HOUR && hour < WORK_END_HOUR;
+
+              if (!withinTime) return null;
+
+              return (
+                show && (
+                  <button
+                    onClick={handleSendLocation}
+                    className="px-6 py-3 rounded-full text-sm font-medium bg-green-600 hover:bg-green-700 text-white transition"
+                  >
+                    Send Location
+                  </button>
+                )
+              );
+            })()}
           </div>
         </div>
 
