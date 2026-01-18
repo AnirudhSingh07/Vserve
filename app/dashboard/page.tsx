@@ -209,29 +209,48 @@ export default function DashboardPage() {
   // handler to sent the location of current user to the backend :
   const handleSendLocation = async () => {
     if (!coords || !userData?.phone) {
-      return alert("Location or user missing");
+      alert("Location or user missing");
+      return;
     }
 
     try {
-      // ✅ NEW: run check-in once if not already checked in
-      if (!checkedIn) {
+      // 1️⃣ Check check-in status from backend
+      const statusRes = await fetch("/api/attendance/ischeckin", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phone: userData.phone }),
+      });
+
+      const statusData = await statusRes.json();
+
+      if (!statusData.success) {
+        throw new Error(statusData.error || "Failed to verify check-in status");
+      }
+
+      // 2️⃣ Auto check-in ONLY if not checked in
+      if (!statusData.checkedIn) {
         const checkinRes = await fetch("/api/attendance/checkin", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ phone: userData.phone, coords }),
+          body: JSON.stringify({
+            phone: userData.phone,
+            coords,
+          }),
         });
+
         const checkinData = await checkinRes.json();
 
-        if (!checkinData.success) {
+        // tolerate "already checked in" safely
+        if (
+          !checkinData.success &&
+          !checkinData.error?.toLowerCase().includes("already")
+        ) {
           throw new Error(checkinData.error || "Auto check-in failed");
         }
-
-        setCheckedIn(true);
-        setPath([]);
       }
 
-      // ✅ existing send location logic (unchanged)
-      const res = await fetch("/api/attendance/sentloc", {
+      // 3️⃣ Send location (independent of check-in result)
+      const locRes = await fetch("/api/attendance/sentloc", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -240,20 +259,15 @@ export default function DashboardPage() {
         }),
       });
 
-      const text = await res.text();
+      const locData = await locRes.json();
 
-      if (!text) {
-        throw new Error("Empty response from server");
-      }
-
-      const data = JSON.parse(text);
-
-      if (!data.success) {
-        throw new Error(data.error || "Failed to send location");
+      if (!locData.success) {
+        throw new Error(locData.error || "Failed to send location");
       }
 
       alert("📍 Location sent successfully!");
     } catch (err: any) {
+      console.error("Send location error:", err);
       alert("❌ Failed to send location: " + err.message);
     }
   };
@@ -427,7 +441,7 @@ export default function DashboardPage() {
               const withinTime =
                 hour >= WORK_START_HOUR && hour < WORK_END_HOUR;
 
-              if (!withinTime) return null;
+              // if (!withinTime) return null;
 
               return (
                 show && (

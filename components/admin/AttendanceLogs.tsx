@@ -304,7 +304,7 @@ export default function AttendanceLogs({
         (row.checkOut || "").includes(query)
       );
     });
-
+  console.log(filteredRows);
 
   return (
     <Card className="shadow-lg border-0 overflow-hidden w-full">
