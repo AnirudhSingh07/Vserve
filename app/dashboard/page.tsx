@@ -13,6 +13,7 @@ import Navbar from "@/components/Navbar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { set } from "mongoose";
 
+
 // Constants
 const OFFICE_CENTER = { lat: 22.723541, lng: 75.884507 };
 const BHOPAL_OFFICE_CENTER = { lat: 23.2349541, lng: 77.4354195 };
@@ -58,6 +59,7 @@ export default function DashboardPage() {
   const WORK_END_HOUR = 18; // 6:00 PM
 
   const mapRef = useRef<google.maps.Map | null>(null);
+
 
   const { isLoaded } = useJsApiLoader({
     id: "google-map-script",
@@ -441,7 +443,7 @@ export default function DashboardPage() {
               const withinTime =
                 hour >= WORK_START_HOUR && hour < WORK_END_HOUR;
 
-              if (!withinTime) return null;
+              // if (!withinTime) return null;
 
               return (
                 show && (

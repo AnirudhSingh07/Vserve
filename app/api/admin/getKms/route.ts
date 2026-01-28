@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { connectDB } from "@/lib/db";
-import DistanceTrack from "@/models/distanceTrack";
+import DistanceTrack from "@/models/dailydistance";
 import Employee from "@/models/employee";
 
 // Disable caching
@@ -13,8 +13,9 @@ export async function GET(req: NextRequest) {
     await connectDB();
 
     // GET /api/getkms?date=2025-11-29
-    const date = req.nextUrl.searchParams.get("date") 
-      || new Date().toISOString().slice(0, 10); // default today
+    const date =
+      req.nextUrl.searchParams.get("date") ||
+      new Date().toISOString().slice(0, 10); // default today
 
     // Fetch all distance records for the date
     const kmData = await DistanceTrack.find({ date });
@@ -49,13 +50,13 @@ export async function GET(req: NextRequest) {
           "Cache-Control":
             "no-store, no-cache, must-revalidate, proxy-revalidate",
         },
-      }
+      },
     );
   } catch (error: any) {
     console.error("GET KMS ERROR:", error);
     return NextResponse.json(
       { success: false, error: error.message },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

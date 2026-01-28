@@ -508,6 +508,7 @@ type SentLocationType = {
   _id: string;
   employeeId: string;
   date: string;
+  totalDistanceKm: number;
   coords: {
     lat: number;
     lng: number;

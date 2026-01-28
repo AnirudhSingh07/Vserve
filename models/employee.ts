@@ -14,6 +14,8 @@ const EmployeeSchema = new Schema(
     dateOfJoining: { type: Date, required: true },
     addressProof: { type: String, required: true }, // can store file URL or base64
     idCardNumber: { type: String },
+    lastKnownCoords: { lat: Number, lng: Number },
+    lastLocationTimestamp: { type: Date },
   },
   { timestamps: true },
 );
