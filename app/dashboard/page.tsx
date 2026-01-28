@@ -110,56 +110,132 @@ export default function DashboardPage() {
   }, []);
 
   // ✅ Universal Location Watcher (Web + Android)
-  useEffect(() => {
-    let watchId: number | string | null = null;
+  // useEffect(() => {
+  //   let watchId: number | string | null = null;
 
-    const startTracking = async () => {
-      try {
-        // Ask permission (works on both web and native)
-        const perm = await Geolocation.requestPermissions();
-        if (perm.location !== "granted") {
-          setError("Location permission not granted");
-          return;
-        }
+  //   const startTracking = async () => {
+  //     try {
+  //       // Ask permission (works on both web and native)
+  //       const perm = await Geolocation.requestPermissions();
+  //       if (perm.location !== "granted") {
+  //         setError("Location permission not granted");
+  //         return;
+  //       }
 
-        // Use Capacitor's native watcher (automatically works on web too)
-        watchId = await Geolocation.watchPosition(
-          { enableHighAccuracy: true },
-          (position, err) => {
-            if (err) {
-              console.error("Error watching position:", err);
-              setError("Error getting location");
-              return;
-            }
-            if (!position) return;
+  //       // Use Capacitor's native watcher (automatically works on web too)
+  //       watchId = await Geolocation.watchPosition(
+  //         { enableHighAccuracy: true },
+  //         (position, err) => {
+  //           if (err) {
+  //             console.error("Error watching position:", err);
+  //             setError("Error getting location");
+  //             return;
+  //           }
+  //           if (!position) return;
 
-            const c = {
-              lat: position.coords.latitude,
-              lng: position.coords.longitude,
-            };
+  //           const c = {
+  //             lat: position.coords.latitude,
+  //             lng: position.coords.longitude,
+  //           };
 
-            setCoords(c);
-            const insideIndore =
-              haversineMeters(c, OFFICE_CENTER) <= OFFICE_RADIUS_METERS;
-            const insideBhopal =
-              haversineMeters(c, BHOPAL_OFFICE_CENTER) <= OFFICE_RADIUS_METERS;
-            setInside(insideIndore || insideBhopal);
-            if (checkedIn) setPath((p) => [...p, [c.lat, c.lng]]);
-            if (mapRef.current) mapRef.current.panTo(c);
-          },
-        );
-      } catch (err) {
-        console.error(err);
-        setError("Failed to start location tracking");
+  //           setCoords(c);
+  //           const insideIndore =
+  //             haversineMeters(c, OFFICE_CENTER) <= OFFICE_RADIUS_METERS;
+  //           const insideBhopal =
+  //             haversineMeters(c, BHOPAL_OFFICE_CENTER) <= OFFICE_RADIUS_METERS;
+  //           setInside(insideIndore || insideBhopal);
+  //           if (checkedIn) setPath((p) => [...p, [c.lat, c.lng]]);
+  //           if (mapRef.current) mapRef.current.panTo(c);
+  //         },
+  //       );
+  //     } catch (err) {
+  //       console.error(err);
+  //       setError("Failed to start location tracking");
+  //     }
+  //   };
+
+  //   startTracking();
+
+  //   return () => {
+  //     if (watchId) Geolocation.clearWatch({ id: String(watchId) });
+  //   };
+  // }, [checkedIn]);
+
+  // ✅ Universal Location Watcher (Web + Android Optimized)
+useEffect(() => {
+  let watchId: string | null = null;
+
+  const startTracking = async () => {
+    try {
+      // 1. Check/Request Permissions
+      const perm = await Geolocation.requestPermissions();
+      if (perm.location !== "granted") {
+        setError("Location permission not granted");
+        return;
       }
-    };
 
-    startTracking();
+      // 2. Initial Get (Ensures we have coords immediately)
+      const currentPos = await Geolocation.getCurrentPosition({
+        enableHighAccuracy: true,
+        timeout: 10000 // 10 seconds timeout
+      });
+      
+      if (currentPos) {
+        updateLocationState(currentPos.coords.latitude, currentPos.coords.longitude);
+      }
 
-    return () => {
-      if (watchId) Geolocation.clearWatch({ id: String(watchId) });
-    };
-  }, [checkedIn]);
+      // 3. Start Watching with explicit Timeout
+      watchId = await Geolocation.watchPosition(
+        { 
+          enableHighAccuracy: true, 
+          timeout: 15000,      // Critical: Don't let it hang forever
+          maximumAge: 3000     // Cache for 3 seconds to save battery
+        },
+        (position, err) => {
+          if (err) {
+            console.error("Watcher Error:", err);
+            // If high accuracy fails, it might be due to signal. Don't stop tracking.
+            return;
+          }
+          if (position) {
+            updateLocationState(position.coords.latitude, position.coords.longitude);
+          }
+        }
+      );
+    } catch (err) {
+      console.error("Tracking failed:", err);
+      setError("Failed to start tracking");
+    }
+  };
+
+  // Helper function to keep code clean
+  const updateLocationState = (lat: number, lng: number) => {
+    const c = { lat, lng };
+    setCoords(c);
+
+    const insideIndore = haversineMeters(c, OFFICE_CENTER) <= OFFICE_RADIUS_METERS;
+    const insideBhopal = haversineMeters(c, BHOPAL_OFFICE_CENTER) <= OFFICE_RADIUS_METERS;
+    setInside(insideIndore || insideBhopal);
+
+    if (checkedIn) {
+      setPath((p) => [...p, [lat, lng]]);
+    }
+    
+    // Smoothly move map to user
+    if (mapRef.current) {
+      mapRef.current.panTo(c);
+    }
+  };
+
+  startTracking();
+
+  return () => {
+    // Correctly clear the watch using the assigned ID
+    if (watchId) {
+      Geolocation.clearWatch({ id: watchId });
+    }
+  };
+}, [checkedIn]); // Re-runs correctly when check-in state changes
 
   const canCheckIn = useMemo(() => inside && !checkedIn, [inside, checkedIn]);
 
