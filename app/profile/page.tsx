@@ -13,6 +13,9 @@ import {
   FileText,
   Loader2,
 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import Link from "next/link";
+import { ArrowLeft } from "lucide-react";
 import Navbar from "@/components/Navbar";
 
 export default function ProfilePage() {
@@ -59,6 +62,16 @@ export default function ProfilePage() {
   return (
     <div className="min-h-screen pt-20 bg-gray-100">
       <Navbar />
+
+       <div className="px-4 sm:px-6 py-5">
+              {/* Back Button */}
+                  <Link href="/admin">
+                    <Button variant="ghost" className="mb-4">
+                      <ArrowLeft className="w-4 h-4 mr-2" />
+                      Back to Admin Panel
+                    </Button>
+                  </Link>
+           </div>
 
       <div className="flex justify-center px-4 py-6 md:py-10">
         <div

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import mongoose from "mongoose";
 import Employee from "@/models/employee";
+import DailyDistance, { IDailyDistance } from "@/models/dailydistance";
 import SentLocation from "@/models/sentLocation";
 import dayjs from "dayjs";
 import utc from "dayjs/plugin/utc";
@@ -17,7 +18,7 @@ export async function GET(req: NextRequest) {
 
     const { searchParams } = new URL(req.url);
     const phone = searchParams.get("phone");
-    const date = searchParams.get("date"); // optional
+    const date = searchParams.get("date"); // YYYY-MM-DD
 
     // 🔴 Validation
     if (!phone) {
@@ -37,29 +38,42 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    // 🧠 Build query
+    // 🎯 FIX: Normalize the target date string
+    // If date is provided, use it. If not, default to Today.
+    const targetDateStr = date
+      ? dayjs.tz(date, "Asia/Kolkata").format("YYYY-MM-DD")
+      : dayjs().tz("Asia/Kolkata").format("YYYY-MM-DD");
+
+    // 🧠 1. Query the pre-calculated distance
+    const distanceRecord = (await DailyDistance.findOne({
+      employeeId: employee._id,
+      date: targetDateStr,
+    })) as IDailyDistance | null;
+
+    const totalDistanceKm = distanceRecord ? distanceRecord.totalKm : 0;
+
+    // 🧠 2. Build Query for Locations
+    // We use targetDateStr to create the start/end times.
+    // This ensures consistency: distance and locations are always for the same day.
+    const targetDateObj = dayjs.tz(targetDateStr, "Asia/Kolkata");
+    
+    const start = targetDateObj.startOf("day").toDate(); // 00:00:00.000
+    const end = targetDateObj.endOf("day").toDate();     // 23:59:59.999
+
     const query: any = {
       employeeId: employee._id,
+      date: { $gte: start, $lte: end }, // ✅ Always filter by the target date
     };
-
-    // 📅 Date filter (optional)
-    if (date) {
-      // ✅ Use IST timezone
-      const now = dayjs().tz("Asia/Kolkata");
-      const start = now.toDate();
-      start.setHours(0, 0, 0, 0);
-
-      const end = now.toDate();
-      end.setHours(23, 59, 59, 999);
-      query.date = { $gte: start, $lte: end };
-    }
 
     // 📍 Fetch sent locations
     const locations = await SentLocation.find(query).sort({ date: 1 }).lean();
 
+    // console.log("Locations found:", locations.length, "for date:", targetDateStr);
+
     return NextResponse.json({
       employee,
       success: true,
+      totalDistanceKm,
       count: locations.length,
       data: locations,
     });
@@ -73,56 +87,99 @@ export async function GET(req: NextRequest) {
   }
 }
 
-//  to store a sent location for an employee
+
 export async function POST(req: NextRequest) {
   try {
     await connectDB();
 
-    const body = await req.json();
-    const { phone, coords } = body;
+    const { phone, coords } = await req.json();
 
-    // 🔴 Validation
     if (!phone || !coords?.lat || !coords?.lng) {
       return NextResponse.json(
-        { success: false, error: "Phone or coordinates missing" },
-        { status: 400 }
+        { success: false, error: "Data missing" },
+        { status: 400 },
       );
     }
 
-    // 🔍 Find employee by phone
     const employee = await Employee.findOne({ phone });
-    console.log("Employee found for send location:", employee);
-
-    if (!employee) {
+    if (!employee)
       return NextResponse.json(
-        { success: false, error: "Employee not found" },
-        { status: 404 }
+        { success: false, error: "Not found" },
+        { status: 404 },
       );
-    }
-    // Correct: store exact UTC instant
+
+    const nowIST = dayjs().tz("Asia/Kolkata");
+    const todayStr = nowIST.format("YYYY-MM-DD");
     const timestamp = dayjs().tz("Asia/Kolkata").toDate();
 
-    // 📍 Create sent location entry
+    // --- 🛣️ CALCULATION PRE-CHECKS ---
+    let segmentKm = 0;
+    const lastUpdate = employee.lastLocationTimestamp
+      ? dayjs(employee.lastLocationTimestamp).tz("Asia/Kolkata")
+      : null;
+    const isNewDay = !lastUpdate || !nowIST.isSame(lastUpdate, "day");
+
+    if (employee.lastKnownCoords?.lat && !isNewDay) {
+      const origin = `${employee.lastKnownCoords.lat},${employee.lastKnownCoords.lng}`;
+
+      const destination = `${coords.lat},${coords.lng}`;
+
+      if (origin !== destination) {
+        const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
+
+        const url = `https://maps.googleapis.com/maps/api/directions/json?origin=${origin}&destination=${destination}&mode=driving&key=${apiKey}`;
+
+        const res = await fetch(url);
+        const routeData = await res.json();
+
+        if (routeData.status === "OK") {
+          segmentKm = routeData.routes[0].legs[0].distance.value / 1000;
+          console.log("5. segmentKm:", segmentKm);
+        }
+      }
+    }
+
+    // --- 💾 ATOMIC UPDATES ---
+
+    // 1. Update Daily Ledger (The string 'todayStr' is key here)
+    const updatedDailyRecord = (await DailyDistance.findOneAndUpdate(
+      { employeeId: employee._id, date: todayStr },
+      { $inc: { totalKm: segmentKm } },
+      { upsert: true, new: true },
+    )) as IDailyDistance;
+
+    // 2. Breadcrumb entry
     const sentLocation = await SentLocation.create({
       employeeId: employee._id,
       date: timestamp,
-      coords: {
-        lat: coords.lat,
-        lng: coords.lng,
-      },
+      coords: { lat: coords.lat, lng: coords.lng },
     });
+
+    // 3. Update Employee State
+    employee.lastKnownCoords = { lat: coords.lat, lng: coords.lng };
+    console.log(
+      "update employee state:",
+      (employee.lastLocationTimestamp = timestamp),
+    );
+
+    // Maintain redundant total on employee for quick lookups
+    employee.dailyDistanceKm = isNewDay
+      ? segmentKm
+      : (employee.dailyDistanceKm || 0) + segmentKm;
+
+    await employee.save();
 
     return NextResponse.json({
       success: true,
-      message: "Location stored successfully",
+      segmentAdded: Number(segmentKm.toFixed(2)),
+      totalToday: Number(updatedDailyRecord.totalKm.toFixed(2)),
       data: sentLocation,
     });
   } catch (error: any) {
-    console.error("Send Location Error:", error);
-
+    console.error("POST Error:", error);
     return NextResponse.json(
       { success: false, error: "Internal server error" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

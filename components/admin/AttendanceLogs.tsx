@@ -216,6 +216,7 @@ import {
   CheckCircle,
   AlertCircle,
   Search,
+  ArrowRight,
 } from "lucide-react";
 
 type AttendanceRow = {
@@ -234,7 +235,8 @@ interface AttendanceLogsProps {
   downloadCSV: () => void;
 }
 
-type DateFilterType = "today" | "yesterday" | "date" | "all";
+// ✅ Updated Type to include "range"
+type DateFilterType = "today" | "yesterday" | "date" | "range" | "all";
 
 export default function AttendanceLogs({
   attRows,
@@ -248,6 +250,14 @@ export default function AttendanceLogs({
   const [dateFilterType, setDateFilterType] = useState<DateFilterType>("today");
 
   const [selectedDate, setSelectedDate] = useState(() => {
+    return new Date().toISOString().split("T")[0];
+  });
+
+  // ✅ New States for Range Filter
+  const [fromDate, setFromDate] = useState(() => {
+    return new Date().toISOString().split("T")[0];
+  });
+  const [toDate, setToDate] = useState(() => {
     return new Date().toISOString().split("T")[0];
   });
 
@@ -278,7 +288,7 @@ export default function AttendanceLogs({
   }
 
   const handleRowClick = (phone: string, date: string) => {
-    const formattedDate = new Date(date).toISOString().split("T")[0];
+    const formattedDate = date.split("T")[0].split(" ")[0];
     router.push(`/admin/sentlocation/${phone}?date=${formattedDate}`);
   };
 
@@ -291,6 +301,11 @@ export default function AttendanceLogs({
       if (dateFilterType === "today") return rowDate === getTodayDate();
       if (dateFilterType === "yesterday") return rowDate === getYesterdayDate();
       if (dateFilterType === "date") return rowDate === selectedDate;
+      
+      // ✅ Range Logic
+      if (dateFilterType === "range") {
+        return rowDate >= fromDate && rowDate <= toDate;
+      }
 
       return true;
     })
@@ -304,12 +319,13 @@ export default function AttendanceLogs({
         (row.checkOut || "").includes(query)
       );
     });
-  console.log(filteredRows);
+  
+  // console.log(filteredRows);
 
   return (
     <Card className="shadow-lg border-0 overflow-hidden w-full">
       {/* Header */}
-      <CardHeader className="bg-gradient-to-r from-slate-50 to-purple-50 border-b px-4 sm:px-6 py-4">
+      <CardHeader className=" bg-gradient-to-r from-slate-50 to-purple-50 border-b px-4 sm:px-6 py-4">
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
           <div className="flex items-center gap-3">
             <div className="bg-purple-100 p-2 rounded-lg flex-shrink-0">
@@ -326,8 +342,8 @@ export default function AttendanceLogs({
           </div>
 
           {/* 🔍 Search + Date Filters */}
-          <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
-            <div className="relative w-full sm:w-64">
+          <div className="flex flex-col xl:flex-row gap-2 w-full xl:w-auto">
+            <div className="relative w-full xl:w-64">
               <Search className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" />
               <input
                 type="text"
@@ -338,35 +354,64 @@ export default function AttendanceLogs({
               />
             </div>
 
-            <select
-              value={dateFilterType}
-              onChange={(e) =>
-                setDateFilterType(e.target.value as DateFilterType)
-              }
-              className="px-3 py-2 text-sm border rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
-            >
-              <option value="today">Today</option>
-              <option value="yesterday">Yesterday</option>
-              <option value="date">Date basis</option>
-              <option value="all">All</option>
-            </select>
+            <div className="flex flex-col sm:flex-row gap-2">
+              <select
+                value={dateFilterType}
+                onChange={(e) =>
+                  setDateFilterType(e.target.value as DateFilterType)
+                }
+                className="px-3 py-2 text-sm border rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+              >
+                <option value="today">Today</option>
+                <option value="yesterday">Yesterday</option>
+                <option value="date">Specific Date</option>
+                <option value="range">Date Range</option> {/* ✅ Added Option */}
+                <option value="all">All Time</option>
+              </select>
 
-            {dateFilterType === "date" && (
-              <div className="relative w-full sm:w-44 px-2">
-                <Calendar className="absolute left-0 top-2.5 w-4 h-4 text-gray-400" />
-                <input
-                  type="date"
-                  value={selectedDate}
-                  onChange={(e) => setSelectedDate(e.target.value)}
-                  className="w-full pl-9 pr-3 py-2 text-sm border rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
-                />
-              </div>
-            )}
+              {/* Specific Date Input */}
+              {dateFilterType === "date" && (
+                <div className="relative w-full sm:w-40">
+                  <input
+                    type="date"
+                    value={selectedDate}
+                    onChange={(e) => setSelectedDate(e.target.value)}
+                    className="w-full px-3 py-2 text-sm border rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  />
+                </div>
+              )}
+
+              {/* ✅ Range Inputs */}
+              {dateFilterType === "range" && (
+                <div className="flex items-center gap-2">
+                  <div className="relative w-full sm:w-36">
+                    <input
+                      type="date"
+                      value={fromDate}
+                      onChange={(e) => setFromDate(e.target.value)}
+                      className="w-full px-2 py-2 text-sm border rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+                      title="From Date"
+                    />
+                  </div>
+                  <ArrowRight className="w-4 h-4 text-gray-400 hidden sm:block" />
+                  <div className="relative w-full sm:w-36">
+                    <input
+                      type="date"
+                      value={toDate}
+                      onChange={(e) => setToDate(e.target.value)}
+                      min={fromDate} // Optional: Prevent selecting end date before start date
+                      className="w-full px-2 py-2 text-sm border rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+                      title="To Date"
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
 
           <Button
             onClick={downloadCSV}
-            className="bg-purple-600 hover:bg-purple-700 text-white shadow-md w-full sm:w-auto text-sm sm:text-base"
+            className="bg-purple-600 hover:bg-purple-700 text-white shadow-md w-full lg:w-auto text-sm sm:text-base"
           >
             <Download className="w-4 h-4 mr-2" />
             Download CSV
