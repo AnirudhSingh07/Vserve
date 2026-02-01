@@ -4,7 +4,7 @@ import React, { useEffect, useState } from "react";
 // In your actual Next.js app, change this import to: import { useSearchParams } from "next/navigation";
 import { useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import  Link  from "next/link";
+import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import NavBar from "@/components/Navbar";
 import {
@@ -19,6 +19,7 @@ import {
   AlertCircle,
   Hash,
 } from "lucide-react";
+import { set } from "mongoose";
 
 type SentLocationType = {
   _id: string;
@@ -44,6 +45,7 @@ const SentLocation = ({ params }: { params: { empphone: string } }) => {
   const date = searchParams.get("date");
   const [data, setData] = useState<SentLocationType[]>([]);
   const [loading, setLoading] = useState(true);
+  const [totalDistanceTavel, setTotalDistanceTravel] = useState(0);
   const [locations, setLocations] = useState<SentLocationType[]>([]);
   const [employee, setEmployee] = useState<Employee | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -53,7 +55,7 @@ const SentLocation = ({ params }: { params: { empphone: string } }) => {
       setLoading(true);
 
       const res = await fetch(
-        `/api/attendance/sentloc?phone=${emphone}&date=${date}`
+        `/api/attendance/sentloc?phone=${emphone}&date=${date}`,
       );
 
       if (!res.ok) {
@@ -63,6 +65,7 @@ const SentLocation = ({ params }: { params: { empphone: string } }) => {
       const result = await res.json();
       console.log("Fetched Sent Locations:", result);
       setLocations(result.data || []);
+      setTotalDistanceTravel(result.totalDistanceKm || 0);
       setEmployee({
         name: result.employee.name,
         fatherName: result.employee.fatherName,
@@ -128,17 +131,24 @@ const SentLocation = ({ params }: { params: { empphone: string } }) => {
     <>
       <NavBar />
       <div className="min-h-screen bg-slate-50/50 pb-12 pt-20">
-       
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+         <div className="flex flex-wrap justify-between items-center mb-8">
            <div className="px-4 sm:px-6 py-5">
-        {/* Back Button */}
+            {/* Back Button */}
             <Link href="/admin">
               <Button variant="ghost" className="mb-4">
                 <ArrowLeft className="w-4 h-4 mr-2" />
                 Back to Admin Panel
               </Button>
             </Link>
-     </div>
+          </div>
+         <div className="mr-5">
+           <Link href={`/admin/employee/${emphone}/report`}>
+            <Button className="bg-blue-600">View Monthly Report</Button>
+          </Link>
+         </div>
+         </div>
+        
           {/* Header Section */}
           <div className="mb-8 flex flex-col justify-between gap-4 md:flex-row md:items-end">
             <div>
@@ -148,7 +158,13 @@ const SentLocation = ({ params }: { params: { empphone: string } }) => {
               <p className="mt-2 text-slate-500">
                 Tracking report for{" "}
                 <span className="font-medium text-slate-900">
-                  {date ? new Date(date).toLocaleDateString() : "Today"}
+                  {date ? new Date(date).toLocaleDateString("en-GB") : "Today"}
+                </span>
+              </p>
+              <p className="mt-2 text-slate-500">
+                Total Distance Travel {" "}
+                <span className="font-medium text-slate-900">
+                  {totalDistanceTavel.toFixed(2)}Km
                 </span>
               </p>
             </div>
@@ -240,7 +256,7 @@ const SentLocation = ({ params }: { params: { empphone: string } }) => {
                           year: "numeric",
                           month: "short",
                           day: "numeric",
-                        }
+                        },
                       )}
                     </p>
                   </div>

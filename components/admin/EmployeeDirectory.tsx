@@ -286,7 +286,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import  Link  from "next/link";
+import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { Card, CardHeader, CardContent, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -578,15 +578,15 @@ export default function EmployeeDirectory({ users }: { users: UserType[] }) {
 
   return (
     <Card className="border-0  rounded-2xl shadow-xl bg-white overflow-hidden">
-     <div className="px-4 sm:px-6 py-5">
+      <div className="px-4 sm:px-6 py-5">
         {/* Back Button */}
-            <Link href="/admin">
-              <Button variant="ghost" className="mb-4">
-                <ArrowLeft className="w-4 h-4 mr-2" />
-                Back to Admin Panel
-              </Button>
-            </Link>
-     </div>
+        <Link href="/admin">
+          <Button variant="ghost" className="mb-4">
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            Back to Admin Panel
+          </Button>
+        </Link>
+      </div>
 
       <CardHeader className="px-4 sm:px-6 py-5 bg-gradient-to-r from-slate-50 via-blue-50 to-indigo-50 border-b">
         <div className="flex flex-wrap items-center justify-between gap-4">
@@ -594,7 +594,6 @@ export default function EmployeeDirectory({ users }: { users: UserType[] }) {
             <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center shadow">
               <User className="w-6 h-6 text-white" />
             </div>
-           
 
             <div>
               <CardTitle className="text-xl sm:text-2xl font-bold text-gray-900">
@@ -667,7 +666,7 @@ export default function EmployeeDirectory({ users }: { users: UserType[] }) {
                       icon={Briefcase}
                     />
 
-                    <div className="mt-6 flex gap-3 justify-end">
+                    <div className="mt-6 flex flex-wrap gap-3 justify-end">
                       {/* 🔹 NEW: Edit Employee Button */}
                       <Button
                         variant="default"
@@ -695,6 +694,12 @@ export default function EmployeeDirectory({ users }: { users: UserType[] }) {
                         <Trash2 className="w-4 h-4 mr-1" />
                         Delete
                       </Button>
+
+                      <Link href={`/admin/employee/${u.phone}/report`}>
+                        <Button className="bg-blue-600">
+                          View Monthly Report
+                        </Button>
+                      </Link>
                     </div>
                   </div>
                 )}
