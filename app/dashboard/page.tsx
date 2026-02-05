@@ -94,19 +94,7 @@ export default function DashboardPage() {
           role: data.user.role,
         });
 
-        // 2️⃣ Check Session Access (Time restrictions)
-        const attRes = await fetch("/api/attendance/status", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ phone: data.user.phone }),
-        });
-        const attData = await attRes.json();
-
-        if (attData.accessDenied) {
-          alert(attData.message || "Access restricted.");
-          setCheckedIn(false);
-          return;
-        }
+   
 
         // 3️⃣ Persistent Check-In State
         const checkinStatusRes = await fetch("/api/attendance/ischeckin", {
