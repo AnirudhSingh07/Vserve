@@ -1,5 +1,3 @@
-
-
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -50,7 +48,7 @@ export default function DashboardPage() {
   const [permissionError, setPermissionError] = useState<string | null>(null);
   const [inside, setInside] = useState(false);
   const [checkedIn, setCheckedIn] = useState(false);
-  const [loading , setLoading] = useState(false);
+  const [loading, setLoading] = useState(false);
   const [path, setPath] = useState<Array<[number, number]>>([]);
   const [userData, setUserData] = useState<UserData | null>(null);
   const [show, setShow] = useState(true);
@@ -71,24 +69,24 @@ export default function DashboardPage() {
     libraries,
   });
 
-// This will trigger every time checkedIn actually changes
-useEffect(() => {
-  console.log("Verified State Change - checkedIn is now:", checkedIn);
-  console.log("Verified State change - show is now :", show);
-}, [checkedIn, show]);
+  // This will trigger every time checkedIn actually changes
+  useEffect(() => {
+    console.log("Verified State Change - checkedIn is now:", checkedIn);
+    console.log("Verified State change - show is now :", show);
+  }, [checkedIn, show]);
 
-// ✅ Fetch user info and attendance status on mount/refresh
+  // ✅ Fetch user info and attendance status on mount/refresh
   useEffect(() => {
     const fetchUserAndStatus = async () => {
       try {
         // setLoading(true); // Uncomment if you have this state defined
-        
+
         // 1️⃣ Get User Data
         const res = await fetch("/api/me", { credentials: "include" });
         const data = await res.json();
 
         if (!data.loggedIn) throw new Error("Not logged in");
-        
+
         setUserData({
           id: data.user._id,
           name: data.user.name,
@@ -107,7 +105,7 @@ useEffect(() => {
         if (attData.accessDenied) {
           alert(attData.message || "Access restricted.");
           setCheckedIn(false);
-          return; 
+          return;
         }
 
         // 3️⃣ Persistent Check-In State
@@ -134,10 +132,9 @@ useEffect(() => {
         if (checkoutData.success) {
           // If checkoutData.checkedOut is true, it means they are done.
           // We set setShow(false) to hide the action buttons.
-          setShow(!checkoutData.checkedOut); 
+          setShow(!checkoutData.checkedOut);
           console.log("Is already checked out:", checkoutData.checkedOut);
         }
-
       } catch (err: any) {
         console.error("Initialization error:", err);
         setError(err.message || "Failed to load user data");
@@ -291,7 +288,6 @@ useEffect(() => {
       const statusData = await statusRes.json();
 
       if (!statusData.success) {
-      
         throw new Error(statusData.error || "Failed to verify check-in status");
       }
 
@@ -538,7 +534,7 @@ useEffect(() => {
             })()}
 
             {/* ✅ Updated Grant Permission Button */}
-            {/* <button
+            <button
               onClick={forceRequestLocation}
               disabled={isRequestingPermission} // Disabled when loading
               className={`px-6 py-3 rounded-full text-sm font-medium text-white mt-4 mb-4 transition ${
@@ -550,7 +546,7 @@ useEffect(() => {
               {isRequestingPermission
                 ? "Locating..."
                 : "📍 Grant Location Permission"}
-            </button> */}
+            </button>
           </div>
         </div>
 
