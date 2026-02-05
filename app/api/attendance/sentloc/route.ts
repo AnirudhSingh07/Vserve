@@ -229,7 +229,7 @@ export async function POST(req: NextRequest) {
 
         const res = await fetch(url);
         const routeData = await res.json();
-        prompt("Google API response:", routeData.status);
+        console.log("Google API response:", routeData.status, routeData);
 
         if (routeData.status === "OK") {
           segmentKm = routeData.routes[0].legs[0].distance.value / 1000;
