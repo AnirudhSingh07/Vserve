@@ -229,6 +229,7 @@ export async function POST(req: NextRequest) {
 
         const res = await fetch(url);
         const routeData = await res.json();
+        prompt("Google API response:", routeData.status);
 
         if (routeData.status === "OK") {
           segmentKm = routeData.routes[0].legs[0].distance.value / 1000;
@@ -239,11 +240,11 @@ export async function POST(req: NextRequest) {
     // --------------------------------------------------
     // 💾 DAILY DISTANCE LEDGER (PER EMPLOYEE PER DAY)
     // --------------------------------------------------
-    const updatedDailyRecord = await DailyDistance.findOneAndUpdate(
+    const updatedDailyRecord = (await DailyDistance.findOneAndUpdate(
       { employeeId: employee._id, date: todayStr },
       { $inc: { totalKm: segmentKm } },
       { upsert: true, new: true },
-    ) as IDailyDistance;
+    )) as IDailyDistance;
 
     // --------------------------------------------------
     // 📍 LOCATION BREADCRUMB
