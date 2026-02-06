@@ -280,7 +280,7 @@ const SentLocation = ({ params }: { params: { empphone: string } }) => {
             </div>
           ) : (
             <div className="space-y-4">
-              {locations.map((item, index) => (
+              {[...locations].reverse().map((item, index) => (
                 <div
                   key={index}
                   className="group relative overflow-hidden rounded-2xl bg-white shadow-sm transition-all duration-300 hover:shadow-lg ring-1 ring-slate-200 hover:ring-blue-100"
