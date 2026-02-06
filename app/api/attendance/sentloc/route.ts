@@ -182,107 +182,193 @@ export async function GET(req: NextRequest) {
 //   }
 // }
 
+// 2nd post function
+// export async function POST(req: NextRequest) {
+//   try {
+//     await connectDB();
+
+//     const { phone, coords } = await req.json();
+
+//     if (!phone || coords?.lat == null || coords?.lng == null) {
+//       return NextResponse.json(
+//         { success: false, error: "Data missing" },
+//         { status: 400 },
+//       );
+//     }
+
+//     const employee = await Employee.findOne({ phone });
+//     if (!employee) {
+//       return NextResponse.json(
+//         { success: false, error: "Employee not found" },
+//         { status: 404 },
+//       );
+//     }
+
+//     const nowIST = dayjs().tz("Asia/Kolkata");
+//     const todayStr = nowIST.format("YYYY-MM-DD");
+//     const timestamp = nowIST.toDate();
+
+//     const lastUpdate = employee.lastLocationTimestamp
+//       ? dayjs(employee.lastLocationTimestamp).tz("Asia/Kolkata")
+//       : null;
+
+//     const isNewDay = !lastUpdate || !nowIST.isSame(lastUpdate, "day");
+
+//     // --------------------------------------------------
+//     // 🛣️ DISTANCE CALCULATION (AUTO-BOOTSTRAP LOGIC)
+//     // --------------------------------------------------
+//     let segmentKm = 0;
+//     const hasBaseline = !!employee.lastKnownCoords?.lat;
+
+//     if (hasBaseline) {
+//       const origin = `${employee.lastKnownCoords.lat},${employee.lastKnownCoords.lng}`;
+//       const destination = `${coords.lat},${coords.lng}`;
+
+//       if (origin !== destination) {
+//         const apiKey = process.env.GOOGLE_MAPS_API_KEY;
+//         const url = `https://maps.googleapis.com/maps/api/directions/json?origin=${origin}&destination=${destination}&mode=driving&key=${apiKey}`;
+
+//         const res = await fetch(url);
+//         const routeData = await res.json();
+
+//         if (routeData.status === "OK") {
+//           segmentKm = routeData.routes[0].legs[0].distance.value / 1000;
+//         }
+//       }
+//     }
+
+//     // --------------------------------------------------
+//     // 💾 DAILY DISTANCE LEDGER (PER EMPLOYEE PER DAY)
+//     // --------------------------------------------------
+//     const updatedDailyRecord = (await DailyDistance.findOneAndUpdate(
+//       { employeeId: employee._id, date: todayStr },
+//       { $inc: { totalKm: segmentKm } },
+//       { upsert: true, new: true },
+//     )) as IDailyDistance;
+
+//     // --------------------------------------------------
+//     // 📍 LOCATION BREADCRUMB
+//     // --------------------------------------------------
+//     const sentLocation = await SentLocation.create({
+//       employeeId: employee._id,
+//       date: timestamp,
+//       coords: {
+//         lat: coords.lat,
+//         lng: coords.lng,
+//       },
+//     });
+
+//     // --------------------------------------------------
+//     // 🧠 EMPLOYEE STATE UPDATE (CRITICAL)
+//     // --------------------------------------------------
+//     employee.lastKnownCoords = {
+//       lat: coords.lat,
+//       lng: coords.lng,
+//     };
+
+//     employee.lastLocationTimestamp = timestamp;
+
+//     await employee.save();
+
+//     // --------------------------------------------------
+//     // ✅ RESPONSE
+//     // --------------------------------------------------
+//     return NextResponse.json({
+//       success: true,
+//       baselineInitialized: !hasBaseline,
+//       segmentAdded: Number(segmentKm.toFixed(2)),
+//       totalToday: Number(updatedDailyRecord.totalKm.toFixed(2)),
+//       data: sentLocation,
+//     });
+//   } catch (error) {
+//     console.error("POST Error:", error);
+//     return NextResponse.json(
+//       { success: false, error: "Internal server error" },
+//       { status: 500 },
+//     );
+//   }
+// }
+
 export async function POST(req: NextRequest) {
   try {
     await connectDB();
-
     const { phone, coords } = await req.json();
 
-    if (!phone || coords?.lat == null || coords?.lng == null) {
-      return NextResponse.json(
-        { success: false, error: "Data missing" },
-        { status: 400 },
-      );
-    }
-
     const employee = await Employee.findOne({ phone });
-    if (!employee) {
+    if (!employee)
       return NextResponse.json(
         { success: false, error: "Employee not found" },
         { status: 404 },
       );
-    }
 
     const nowIST = dayjs().tz("Asia/Kolkata");
     const todayStr = nowIST.format("YYYY-MM-DD");
-    const timestamp = nowIST.toDate();
 
-    const lastUpdate = employee.lastLocationTimestamp
-      ? dayjs(employee.lastLocationTimestamp).tz("Asia/Kolkata")
-      : null;
-
-    const isNewDay = !lastUpdate || !nowIST.isSame(lastUpdate, "day");
-
-    // --------------------------------------------------
-    // 🛣️ DISTANCE CALCULATION (AUTO-BOOTSTRAP LOGIC)
-    // --------------------------------------------------
     let segmentKm = 0;
     const hasBaseline = !!employee.lastKnownCoords?.lat;
 
+    console.log("--- DEBUG DISTANCE START ---");
+    console.log("Employee found:", employee.name);
+    console.log("Has Baseline:", hasBaseline);
+
+    // Testing ke liye humne !isNewDay hata diya hai
     if (hasBaseline) {
       const origin = `${employee.lastKnownCoords.lat},${employee.lastKnownCoords.lng}`;
       const destination = `${coords.lat},${coords.lng}`;
+      const apiKey = process.env.GOOGLE_MAPS_API_KEY;
+
+      console.log("Origin:", origin);
+      console.log("Destination:", destination);
 
       if (origin !== destination) {
-        const apiKey = process.env.GOOGLE_MAPS_API_KEY;
         const url = `https://maps.googleapis.com/maps/api/directions/json?origin=${origin}&destination=${destination}&mode=driving&key=${apiKey}`;
 
         const res = await fetch(url);
         const routeData = await res.json();
 
+        console.log("Google API Status:", routeData.status);
+
         if (routeData.status === "OK") {
+          // Meter ko KM me convert kar rahe hain
           segmentKm = routeData.routes[0].legs[0].distance.value / 1000;
+          console.log("Distance found (KM):", segmentKm);
+        } else {
+          // Agar Google mana kare (e.g. ZERO_RESULTS ya REQUEST_DENIED)
+          console.error(
+            "Google Error Message:",
+            routeData.error_message || "No error message",
+          );
         }
+      } else {
+        console.log("Origin and Destination are same. Skipping API call.");
       }
     }
 
-    // --------------------------------------------------
-    // 💾 DAILY DISTANCE LEDGER (PER EMPLOYEE PER DAY)
-    // --------------------------------------------------
+    // Daily Record Update
     const updatedDailyRecord = (await DailyDistance.findOneAndUpdate(
       { employeeId: employee._id, date: todayStr },
       { $inc: { totalKm: segmentKm } },
       { upsert: true, new: true },
     )) as IDailyDistance;
 
-    // --------------------------------------------------
-    // 📍 LOCATION BREADCRUMB
-    // --------------------------------------------------
-    const sentLocation = await SentLocation.create({
-      employeeId: employee._id,
-      date: timestamp,
-      coords: {
-        lat: coords.lat,
-        lng: coords.lng,
-      },
-    });
+    console.log("Total Today in DB:", updatedDailyRecord.totalKm);
 
-    // --------------------------------------------------
-    // 🧠 EMPLOYEE STATE UPDATE (CRITICAL)
-    // --------------------------------------------------
-    employee.lastKnownCoords = {
-      lat: coords.lat,
-      lng: coords.lng,
-    };
-
-    employee.lastLocationTimestamp = timestamp;
-
+    // Save current coords for NEXT calculation
+    employee.lastKnownCoords = { lat: coords.lat, lng: coords.lng };
+    employee.lastLocationTimestamp = nowIST.toDate();
     await employee.save();
 
-    // --------------------------------------------------
-    // ✅ RESPONSE
-    // --------------------------------------------------
+    console.log("--- DEBUG DISTANCE END ---");
+
     return NextResponse.json({
       success: true,
-      baselineInitialized: !hasBaseline,
       segmentAdded: Number(segmentKm.toFixed(2)),
       totalToday: Number(updatedDailyRecord.totalKm.toFixed(2)),
-      data: sentLocation,
     });
   } catch (error) {
     console.error("POST Error:", error);
     return NextResponse.json(
-      { success: false, error: "Internal server error" },
+      { success: false, error: "Internal error" },
       { status: 500 },
     );
   }
