@@ -303,6 +303,7 @@ export async function POST(req: NextRequest) {
 
     const nowIST = dayjs().tz("Asia/Kolkata");
     const todayStr = nowIST.format("YYYY-MM-DD");
+    const timestamp = nowIST.toDate();
 
     let segmentKm = 0;
     const hasBaseline = !!employee.lastKnownCoords?.lat;
@@ -352,6 +353,18 @@ export async function POST(req: NextRequest) {
     )) as IDailyDistance;
 
     console.log("Total Today in DB:", updatedDailyRecord.totalKm);
+
+    // --------------------------------------------------
+    // 📍 LOCATION BREADCRUMB
+    // --------------------------------------------------
+    const sentLocation = await SentLocation.create({
+      employeeId: employee._id,
+      date: timestamp,
+      coords: {
+        lat: coords.lat,
+        lng: coords.lng,
+      },
+    });
 
     // Save current coords for NEXT calculation
     employee.lastKnownCoords = { lat: coords.lat, lng: coords.lng };
