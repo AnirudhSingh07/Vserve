@@ -94,8 +94,6 @@ export default function DashboardPage() {
           role: data.user.role,
         });
 
-   
-
         // 3️⃣ Persistent Check-In State
         const checkinStatusRes = await fetch("/api/attendance/ischeckin", {
           method: "POST",
@@ -522,7 +520,7 @@ export default function DashboardPage() {
             })()}
 
             {/* ✅ Updated Grant Permission Button */}
-          {/*  <button
+            {/*  <button
               onClick={forceRequestLocation}
               disabled={isRequestingPermission} // Disabled when loading
               className={`px-6 py-3 rounded-full text-sm font-medium text-white mt-4 mb-4 transition ${
