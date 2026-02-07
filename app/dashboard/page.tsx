@@ -58,7 +58,7 @@ export default function DashboardPage() {
   const [isSendingLocation, setIsSendingLocation] = useState(false);
   const [isRequestingPermission, setIsRequestingPermission] = useState(false);
 
-  const WORK_START_HOUR = 0; // 9:00 AM
+  const WORK_START_HOUR = 9; // 9:00 AM
   const WORK_END_HOUR = 18; // 6:00 PM
 
   const mapRef = useRef<google.maps.Map | null>(null);
@@ -523,7 +523,7 @@ export default function DashboardPage() {
             })()}
 
             {/* ✅ Updated Grant Permission Button */}
-             <button
+             {/*<button
               onClick={forceRequestLocation}
               disabled={isRequestingPermission} // Disabled when loading
               className={`px-6 py-3 rounded-full text-sm font-medium text-white mt-4 mb-4 transition ${
@@ -535,9 +535,9 @@ export default function DashboardPage() {
               {isRequestingPermission
                 ? "Locating..."
                 : "📍 Grant Location Permission"}
-            </button> 
-          </div>
-        </div>
+            </button> */}
+          </div> 
+        </div> 
 
         {/* Status Messages */}
         <div className="text-center text-sm">
