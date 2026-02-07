@@ -12,11 +12,10 @@ import Employee from "@/models/employee";
 //   }
 // }
 
-
 // 🚀 This tells Next.js and Vercel to NEVER cache this API route
-export const dynamic = "force-dynamic";
+ export const dynamic = "force-dynamic";
 export const revalidate = 0; // disable ISR (Incremental Static Regeneration)
-export const fetchCache = "force-no-store"; // for Next.js 14+
+ export const fetchCache = "force-no-store"; // for Next.js 14+
 
 export async function GET() {
   try {
@@ -38,3 +37,4 @@ export async function GET() {
     );
   }
 }
+
