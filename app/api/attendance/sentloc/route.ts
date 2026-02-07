@@ -316,7 +316,7 @@ export async function POST(req: NextRequest) {
     if (hasBaseline) {
       const origin = `${employee.lastKnownCoords.lat},${employee.lastKnownCoords.lng}`;
       const destination = `${coords.lat},${coords.lng}`;
-      
+
       const apiKey = process.env.GOOGLE_MAPS_API_KEY;
 
       console.log("Origin:", origin);
@@ -367,11 +367,26 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    // Save current coords for NEXT calculation
-    employee.lastKnownCoords = { lat: coords.lat, lng: coords.lng };
-    console.log("lastknownCoords are ", employee.lastKnownCoords);
-    employee.lastLocationTimestamp = nowIST.toDate();
-    await employee.save();
+    // --------------------------------------------------
+    // 🧠 EMPLOYEE STATE UPDATE (FORCE WRITE)
+    // --------------------------------------------------
+    // Hum findByIdAndUpdate use kar rahe hain taaki agar schema cache issue ho
+    // toh bhi MongoDB direct update accept kar le.
+
+    // Naya Tarika (Direct DB Hit):
+    await Employee.findByIdAndUpdate(
+      employee._id,
+      {
+        $set: {
+          lastKnownCoords: {
+            lat: Number(coords.lat), // Ensure Number type
+            lng: Number(coords.lng),
+          },
+          lastLocationTimestamp: nowIST.toDate(),
+        },
+      },
+      { new: true }, // Return updated doc (optional)
+    );
 
     console.log("--- DEBUG DISTANCE END ---");
 
