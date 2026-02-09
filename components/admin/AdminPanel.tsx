@@ -1,5 +1,3 @@
-
-
 "use client";
 
 import { UserPlus } from "lucide-react";
@@ -67,8 +65,7 @@ export default function AdminPanel() {
     return map;
   }, [users]);
 
-
-     useEffect(() => {
+  useEffect(() => {
     const fetchData = async () => {
       try {
         setLoading(true);
@@ -92,6 +89,7 @@ export default function AdminPanel() {
 
         if (attRes.ok) {
           const data = await attRes.json();
+   
           // 🔹 ADDED: store raw attendance only
           setRawAttendance(data.data || []);
         }
@@ -105,7 +103,6 @@ export default function AdminPanel() {
 
     fetchData();
   }, []);
-
 
   // 🔹 ADDED: build attendance rows AFTER users + attendance are ready
   useEffect(() => {
@@ -202,8 +199,8 @@ export default function AdminPanel() {
             Employee Directory
           </button>
 
-               {/* 🔹 NEW: Create Employee Button */}
-           <button
+          {/* 🔹 NEW: Create Employee Button */}
+          <button
             onClick={handleCreateEmployeeClick}
             className="bg-green-500 hover:bg-green-600 text-white font-medium py-2 px-4 rounded transition-colors duration-200 flex items-center gap-2"
           >

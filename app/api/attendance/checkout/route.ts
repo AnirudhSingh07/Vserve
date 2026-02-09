@@ -17,8 +17,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, error: "Employee not found" });
 
     const now = dayjs();
-    const currentHour = now.hour();
-    const WORK_START_HOUR = 9;   // 9:00 AM
+    
+   
     const today = now.startOf("day").toDate();
 
     // 🔍 Find today's attendance
@@ -40,17 +40,7 @@ export async function POST(req: NextRequest) {
       });
 
 
-    // ❌ Prevent manual checkout before 8 AM (optional)
-    if (currentHour < WORK_START_HOUR) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: "Checkout not allowed before 8:00 AM.",
-        },
-        { status: 403 }
-      );
-    }
-
+ 
     // ✅ Normal manual checkout (within hours)
     attendance.checkOutTime = now.toDate();
     attendance.checkOutLocation = coords;
