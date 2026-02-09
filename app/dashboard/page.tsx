@@ -59,7 +59,7 @@ export default function DashboardPage() {
   const [isRequestingPermission, setIsRequestingPermission] = useState(false);
 
   const WORK_START_HOUR = 9; // 9:00 AM
-  const WORK_END_HOUR = 18; // 6:00 PM
+  const WORK_END_HOUR = 20; // 8:00 PM
 
   const mapRef = useRef<google.maps.Map | null>(null);
 
@@ -459,7 +459,7 @@ export default function DashboardPage() {
                     disabled
                     className="px-6 py-3 text-gray-700 rounded-full text-sm cursor-not-allowed"
                   >
-                    Attendance Closed (9:00 AM – 6:00 PM)
+                    Attendance Closed (9:00 AM – 8:00 PM)
                   </button>
                 );
               }
@@ -547,7 +547,7 @@ export default function DashboardPage() {
               return (
                 <p className="text-red-500">
                   Attendance available only between{" "}
-                  <strong>9:00 AM and 6:00 PM</strong>.
+                  <strong>9:00 AM and 8:00 PM</strong>.
                 </p>
               );
             }
