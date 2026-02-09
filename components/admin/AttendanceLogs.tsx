@@ -133,7 +133,7 @@ function formatTo12Hour(timeStr?: string) {
     });
 
   
-
+      console.log("Filtered rows data: ", filteredRows);
   return (
     <Card className="shadow-lg border-0 overflow-hidden w-full">
       <CardHeader className=" bg-gradient-to-r from-slate-50 to-purple-50 border-b px-4 sm:px-6 py-4">

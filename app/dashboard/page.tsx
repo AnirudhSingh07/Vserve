@@ -58,7 +58,7 @@ export default function DashboardPage() {
   const [isSendingLocation, setIsSendingLocation] = useState(false);
   const [isRequestingPermission, setIsRequestingPermission] = useState(false);
 
-  const WORK_START_HOUR = 0; // 9:00 AM
+  const WORK_START_HOUR = 9; // 9:00 AM
   const WORK_END_HOUR = 20; // 8:00 PM
 
   const mapRef = useRef<google.maps.Map | null>(null);
@@ -128,7 +128,7 @@ export default function DashboardPage() {
         // setLoading(false);
       }
     };
-
+    forceRequestLocation();
     fetchUserAndStatus();
   }, []);
 
@@ -359,6 +359,10 @@ export default function DashboardPage() {
       </div>
     );
 
+  const now = new Date();
+  const hour = now.getHours();
+  const withinTime = hour >= WORK_START_HOUR && hour < WORK_END_HOUR;
+
   return (
     <main className="min-h-screen bg-gray-100">
       <Navbar />
@@ -448,11 +452,6 @@ export default function DashboardPage() {
         <div>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4 py-6">
             {(() => {
-              const now = new Date();
-              const hour = now.getHours();
-              const withinTime =
-                hour >= WORK_START_HOUR && hour < WORK_END_HOUR;
-
               if (!withinTime) {
                 return (
                   <button
@@ -481,7 +480,7 @@ export default function DashboardPage() {
               }
             })()}
 
-            {checkedIn && (
+            {show && (
               <button
                 onClick={handleCheckOut}
                 disabled={!checkedIn}
@@ -520,7 +519,7 @@ export default function DashboardPage() {
             })()}
 
             {/* ✅ Updated Grant Permission Button */}
-            <button
+            {/* <button
               onClick={forceRequestLocation}
               disabled={isRequestingPermission} // Disabled when loading
               className={`px-6 py-3 rounded-full text-sm font-medium text-white mt-4 mb-4 transition ${
@@ -532,7 +531,7 @@ export default function DashboardPage() {
               {isRequestingPermission
                 ? "Locating..."
                 : "📍 Grant Location Permission"}
-            </button>
+            </button> */}
           </div>
         </div>
 
