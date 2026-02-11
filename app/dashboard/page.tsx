@@ -314,8 +314,7 @@ export default function DashboardPage() {
         throw new Error(locData.error || "Failed to send location");
       }
 
-      alert("coordinates: " + JSON.stringify(coords));
-      alert(process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY);
+      
       alert("📍 Location sent successfully!");
     } catch (err: any) {
       console.error("Send location error:", err);
