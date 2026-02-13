@@ -58,6 +58,9 @@ export default function DashboardPage() {
   const [isSendingLocation, setIsSendingLocation] = useState(false);
   const [isRequestingPermission, setIsRequestingPermission] = useState(false);
 
+  // ✅ NEW: Checkout Modal State
+  const [showCheckoutModal, setShowCheckoutModal] = useState(false);
+
   const WORK_START_HOUR = 9; // 9:00 AM
   const WORK_END_HOUR = 20; // 8:00 PM
 
@@ -314,7 +317,6 @@ export default function DashboardPage() {
         throw new Error(locData.error || "Failed to send location");
       }
 
-      
       alert("📍 Location sent successfully!");
     } catch (err: any) {
       console.error("Send location error:", err);
@@ -360,6 +362,12 @@ export default function DashboardPage() {
         Loading Google Map...
       </div>
     );
+
+  // ✅ NEW: Confirm Checkout
+  const confirmCheckOut = async () => {
+    setShowCheckoutModal(false);
+    await handleCheckOut();
+  };
 
   const now = new Date();
   const hour = now.getHours();
@@ -484,7 +492,7 @@ export default function DashboardPage() {
 
             {show && (
               <button
-                onClick={handleCheckOut}
+                onClick={() => setShowCheckoutModal(true)} // Open modal instead
                 disabled={!checkedIn}
                 className={`px-6 py-3 rounded-full text-sm font-medium text-white transition ${
                   checkedIn
@@ -521,7 +529,7 @@ export default function DashboardPage() {
             })()}
 
             {/* ✅ Updated Grant Permission Button */}
-             {/*<button
+            {/*<button
               onClick={forceRequestLocation}
               disabled={isRequestingPermission} // Disabled when loading
               className={`px-6 py-3 rounded-full text-sm font-medium text-white mt-4 mb-4 transition ${
@@ -534,8 +542,35 @@ export default function DashboardPage() {
                 ? "Locating..."
                 : "📍 Grant Location Permission"}
             </button> */}
-          </div> 
-        </div> 
+          </div>
+        </div>
+
+        {showCheckoutModal && (
+          <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
+            <div className="bg-white rounded-2xl shadow-lg p-6 w-[90%] max-w-sm text-center">
+              <h2 className="text-lg font-semibold mb-4">Confirm Check Out</h2>
+              <p className="text-sm text-gray-600 mb-6">
+                Are you sure you want to check out for today?
+              </p>
+
+              <div className="flex justify-center gap-4">
+                <button
+                  onClick={() => setShowCheckoutModal(false)}
+                  className="px-4 py-2 rounded-full bg-gray-300 hover:bg-gray-400 text-sm"
+                >
+                  Cancel
+                </button>
+
+                <button
+                  onClick={confirmCheckOut}
+                  className="px-4 py-2 rounded-full bg-red-600 hover:bg-red-700 text-white text-sm"
+                >
+                  Yes, Check Out
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Status Messages */}
         <div className="text-center text-sm">
