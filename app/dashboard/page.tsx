@@ -490,19 +490,28 @@ export default function DashboardPage() {
               }
             })()}
 
-            {show && (
-              <button
-                onClick={() => setShowCheckoutModal(true)} // Open modal instead
-                disabled={!checkedIn}
-                className={`px-6 py-3 rounded-full text-sm font-medium text-white transition ${
-                  checkedIn
-                    ? "bg-red-600 hover:bg-red-700"
-                    : "bg-gray-400 cursor-not-allowed"
-                }`}
-              >
-                Check Out
-              </button>
-            )}
+            {(() => {
+              const now = new Date();
+              const hour = now.getHours();
+              const withinTime =
+                hour >= WORK_START_HOUR && hour < WORK_END_HOUR;
+              if (!withinTime) return null;
+              return (
+                show && (
+                  <button
+                    onClick={() => setShowCheckoutModal(true)} // Open modal instead
+                    disabled={!checkedIn}
+                    className={`px-6 py-3 rounded-full text-sm font-medium text-white transition ${
+                      checkedIn
+                        ? "bg-red-600 hover:bg-red-700"
+                        : "bg-gray-400 cursor-not-allowed"
+                    }`}
+                  >
+                    Check Out
+                  </button>
+                )
+              );
+            })()}
 
             {(() => {
               const now = new Date();
