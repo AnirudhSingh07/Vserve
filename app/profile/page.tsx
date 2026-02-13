@@ -65,10 +65,10 @@ export default function ProfilePage() {
 
        <div className="px-4 sm:px-6 py-5">
               {/* Back Button */}
-                  <Link href="/admin">
+                  <Link href="/">
                     <Button variant="ghost" className="mb-4">
                       <ArrowLeft className="w-4 h-4 mr-2" />
-                      Back to Admin Panel
+                      Back to Home
                     </Button>
                   </Link>
            </div>
