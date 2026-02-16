@@ -8,7 +8,7 @@ const EmployeeSchema = new Schema(
     passwordHash: { type: String, required: true },
     location: { type: String, default: "India" },
     department: { type: String, required: true },
-    role: { type: String, default: "employee" },
+    role: { type: String, default: "executive" },
     panCard: { type: String, required: true },
     bankAccountNumber: { type: String, required: true },
     dateOfJoining: { type: Date, required: true },
