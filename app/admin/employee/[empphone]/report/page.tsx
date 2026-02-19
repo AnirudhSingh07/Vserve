@@ -965,18 +965,18 @@ const EmployeeReportPage = ({ params }: { params: { empphone: string } }) => {
               // Full day leave - need to calculate actual days within the report range
               const actualStart = leaveStart > startDate ? leaveStart : startDate;
               const actualEnd = leaveEnd < endDate ? leaveEnd : endDate;
-              
+
               // Count weekdays (excluding Sundays) in the overlap period
               let current = new Date(actualStart);
               let leaveDaysInRange = 0;
-              
+
               while (current <= actualEnd) {
                 if (current.getDay() !== 0) { // Exclude Sundays
                   leaveDaysInRange++;
                 }
                 current.setDate(current.getDate() + 1);
               }
-              
+
               totalFormalLeaveDays += leaveDaysInRange;
               console.log(
                 `  → Full-day leave: ${leaveDaysInRange} days (Total formal: ${totalFormalLeaveDays})`
@@ -994,10 +994,10 @@ const EmployeeReportPage = ({ params }: { params: { empphone: string } }) => {
           startDate,
           endDate,
         );
-        
+
         // Store total working days in state
         setTotalWorkingDays(totalWorkingDays);
-        
+
         const presentDays = data.report.attendance.presentDays;
 
         // Convert half days to full day equivalent (1 half day = 1 full day)
@@ -1007,9 +1007,9 @@ const EmployeeReportPage = ({ params }: { params: { empphone: string } }) => {
         absencesWithoutLeave = Math.max(
           0,
           totalWorkingDays -
-            presentDays -
-            totalFormalLeaveDays -
-            halfDaysAsFullDays,
+          presentDays -
+          totalFormalLeaveDays -
+          halfDaysAsFullDays,
         );
 
         // Round to 1 decimal place
@@ -1100,27 +1100,27 @@ const EmployeeReportPage = ({ params }: { params: { empphone: string } }) => {
       const lateRate =
         data.report.attendance.presentDays > 0
           ? (
-              (data.report.attendance.status.late /
-                data.report.attendance.presentDays) *
-              100
-            ).toFixed(1)
+            (data.report.attendance.status.late /
+              data.report.attendance.presentDays) *
+            100
+          ).toFixed(1)
           : "0";
 
       const avgDistance =
         data.report.attendance.presentDays > 0
           ? (
-              data.report.travel.totalDistanceKm /
-              data.report.attendance.presentDays
-            ).toFixed(2)
+            data.report.travel.totalDistanceKm /
+            data.report.attendance.presentDays
+          ).toFixed(2)
           : "0";
 
       const punctualityScore =
         data.report.attendance.presentDays > 0
           ? (
-              (data.report.attendance.status.onTime /
-                data.report.attendance.presentDays) *
-              100
-            ).toFixed(1)
+            (data.report.attendance.status.onTime /
+              data.report.attendance.presentDays) *
+            100
+          ).toFixed(1)
           : "0";
 
       // Employee Information Sheet
@@ -1322,31 +1322,28 @@ const EmployeeReportPage = ({ params }: { params: { empphone: string } }) => {
               <div className="flex gap-2 mb-3">
                 <button
                   onClick={() => setFilterMode("current")}
-                  className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
-                    filterMode === "current"
+                  className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${filterMode === "current"
                       ? "bg-slate-900 text-white"
                       : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-                  }`}
+                    }`}
                 >
                   Current Month
                 </button>
                 <button
                   onClick={() => setFilterMode("single")}
-                  className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
-                    filterMode === "single"
+                  className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${filterMode === "single"
                       ? "bg-slate-900 text-white"
                       : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-                  }`}
+                    }`}
                 >
                   Select Month
                 </button>
                 <button
                   onClick={() => setFilterMode("range")}
-                  className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
-                    filterMode === "range"
+                  className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${filterMode === "range"
                       ? "bg-slate-900 text-white"
                       : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-                  }`}
+                    }`}
                 >
                   Date Range
                 </button>
@@ -1755,10 +1752,10 @@ const EmployeeReportPage = ({ params }: { params: { empphone: string } }) => {
                         <span className="text-sm font-semibold text-green-600">
                           {data.report.attendance.presentDays > 0
                             ? (
-                                (data.report.attendance.status.onTime /
-                                  data.report.attendance.presentDays) *
-                                100
-                              ).toFixed(1)
+                              (data.report.attendance.status.onTime /
+                                data.report.attendance.presentDays) *
+                              100
+                            ).toFixed(1)
                             : 0}
                           %
                         </span>
@@ -1788,10 +1785,10 @@ const EmployeeReportPage = ({ params }: { params: { empphone: string } }) => {
                         <span className="text-sm font-semibold text-red-600">
                           {data.report.attendance.presentDays > 0
                             ? (
-                                (data.report.attendance.status.late /
-                                  data.report.attendance.presentDays) *
-                                100
-                              ).toFixed(1)
+                              (data.report.attendance.status.late /
+                                data.report.attendance.presentDays) *
+                              100
+                            ).toFixed(1)
                             : 0}
                           %
                         </span>
@@ -1803,9 +1800,9 @@ const EmployeeReportPage = ({ params }: { params: { empphone: string } }) => {
                         <span className="text-sm font-semibold text-blue-600">
                           {data.report.attendance.presentDays > 0
                             ? (
-                                data.report.travel.totalDistanceKm /
-                                data.report.attendance.presentDays
-                              ).toFixed(2)
+                              data.report.travel.totalDistanceKm /
+                              data.report.attendance.presentDays
+                            ).toFixed(2)
                             : 0}{" "}
                           km
                         </span>

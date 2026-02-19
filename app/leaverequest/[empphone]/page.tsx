@@ -84,7 +84,8 @@ export default function LeaveRequestPage() {
           body: JSON.stringify({ phoneNo: empphone }),
         });
         const data = await res.json();
-        if (res.ok) setNotifications(data.data);
+        if (res.ok) setNotifications(data.data || []);
+        else setNotifications([]);
       } catch (err) {
         console.error("Failed to fetch notifications", err);
         setNotifications([]);
@@ -101,7 +102,7 @@ export default function LeaveRequestPage() {
     yesterday.setDate(now.getDate() - 1);
     const yesterdayStr = yesterday.toISOString().split("T")[0];
 
-    return notifications.filter((notif) => {
+    return (notifications || []).filter((notif) => {
       const notifDate = new Date(notif.createdAt || new Date())
         .toISOString()
         .split("T")[0];
@@ -178,11 +179,10 @@ export default function LeaveRequestPage() {
                       key={t}
                       type="button"
                       onClick={() => setLeaveType(t)}
-                      className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all capitalize ${
-                        leaveType === t
+                      className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all capitalize ${leaveType === t
                           ? "bg-white shadow-sm text-blue-600"
                           : "text-gray-500 hover:text-gray-700"
-                      }`}
+                        }`}
                     >
                       {t === "range" ? "Range" : t}
                     </button>
@@ -200,11 +200,10 @@ export default function LeaveRequestPage() {
                           onClick={() =>
                             setFormData({ ...formData, halfDaySlot: slot })
                           }
-                          className={`flex-1 py-3 rounded-xl border-2 font-bold transition-all ${
-                            formData.halfDaySlot === slot
+                          className={`flex-1 py-3 rounded-xl border-2 font-bold transition-all ${formData.halfDaySlot === slot
                               ? "border-blue-500 bg-blue-50 text-blue-600"
                               : "border-gray-100 text-gray-400"
-                          }`}
+                            }`}
                         >
                           {slot === "Morning" ? "☀️ Morning" : "🌤️ Afternoon"}
                         </button>
@@ -403,13 +402,12 @@ export default function LeaveRequestPage() {
                             </h4>
                           </div>
                           <span
-                            className={`px-3 py-1 rounded-full text-[10px] font-black uppercase ${
-                              notif.status === "Approved"
+                            className={`px-3 py-1 rounded-full text-[10px] font-black uppercase ${notif.status === "Approved"
                                 ? "bg-green-100 text-green-700"
                                 : notif.status === "Rejected"
                                   ? "bg-red-100 text-red-700"
                                   : "bg-amber-100 text-amber-700"
-                            }`}
+                              }`}
                           >
                             {notif.status || "Pending"}
                           </span>
