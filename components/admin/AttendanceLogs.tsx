@@ -52,31 +52,32 @@ export default function AttendanceLogs({
     return new Date().toISOString().split("T")[0];
   });
 
-
   // ✅ New Helper function to format time to 12-hour format
-function formatTo12Hour(timeStr?: string) {
-  if (!timeStr || timeStr === "—") return "—";
+  function formatTo12Hour(timeStr?: string) {
+    if (!timeStr || timeStr === "—") return "—";
 
-  // 1. If the string already contains AM or PM, it's already formatted.
-  // We can just clean up the seconds if you want.
-  if (timeStr.toLowerCase().includes("am") || timeStr.toLowerCase().includes("pm")) {
-    const [time, modifier] = timeStr.split(" "); // ["5:46:41", "PM"]
-    const parts = time.split(":");
-    return `${parts[0]}:${parts[1]} ${modifier}`; // Returns "05:46 PM"
+    // 1. If the string already contains AM or PM, it's already formatted.
+    // We can just clean up the seconds if you want.
+    if (
+      timeStr.toLowerCase().includes("am") ||
+      timeStr.toLowerCase().includes("pm")
+    ) {
+      const [time, modifier] = timeStr.split(" "); // ["5:46:41", "PM"]
+      const parts = time.split(":");
+      return `${parts[0]}:${parts[1]} ${modifier}`; // Returns "05:46 PM"
+    }
+
+    // 2. Fallback logic for 24-hour strings (like "17:46:00")
+    const parts = timeStr.split(":");
+    let hours = parseInt(parts[0], 10);
+    const minutes = parts[1];
+    const ampm = hours >= 12 ? "PM" : "AM";
+
+    hours = hours % 12;
+    hours = hours ? hours : 12; // the hour '0' should be '12'
+
+    return `${String(hours).padStart(2, "0")}:${minutes} ${ampm}`;
   }
-
-  // 2. Fallback logic for 24-hour strings (like "17:46:00")
-  const parts = timeStr.split(":");
-  let hours = parseInt(parts[0], 10);
-  const minutes = parts[1];
-  const ampm = hours >= 12 ? "PM" : "AM";
-  
-  hours = hours % 12;
-  hours = hours ? hours : 12; // the hour '0' should be '12'
-  
-  return `${String(hours).padStart(2, '0')}:${minutes} ${ampm}`;
-}
-
 
   function extractDate(input: string) {
     const date = new Date(input);
@@ -103,6 +104,61 @@ function formatTo12Hour(timeStr?: string) {
     d.setDate(d.getDate() - 1);
     return d.toISOString().split("T")[0];
   }
+
+  const handleDownloadCSV = () => {
+    const headers = [
+      "Name",
+      "Phone",
+      "Date",
+      "Status",
+      "Check-In",
+      "Check-Out",
+      "Location",
+      "Department",
+    ];
+
+    const csvRows = filteredRows.map((row) => {
+      // Compute status using the same logic as the table
+      let status = "--";
+      if (row.checkIn) {
+        const [hours, minutes] = row.checkIn.split(":").map(Number);
+        const checkInMinutes = hours * 60 + minutes;
+        const nineAM = 9 * 60;
+        const tenAM = 10 * 60;
+        status =
+          checkInMinutes < nineAM || checkInMinutes > tenAM
+            ? "Late"
+            : "On-time";
+      }
+
+      return [
+        row.name,
+        row.phone,
+        extractDate(row.date), // DD/MM/YYYY format
+        status, // "On-time" / "Late" / "--"
+        formatTo12Hour(row.checkIn), // 12-hour format
+        formatTo12Hour(row.checkOut), // 12-hour format
+        row.location || "—",
+        row.department || "—",
+      ]
+        .map((val) => `"${String(val).replace(/"/g, '""')}"`)
+        .join(",");
+    });
+
+    const csvContent = [headers.join(","), ...csvRows].join("\n");
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.setAttribute(
+      "download",
+      `attendance_${dateFilterType}_${new Date().toISOString().split("T")[0]}.csv`,
+    );
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
 
   const handleRowClick = (phone: string, date: string) => {
     const formattedDate = date.split("T")[0].split(" ")[0];
@@ -132,8 +188,7 @@ function formatTo12Hour(timeStr?: string) {
       );
     });
 
-  
-      console.log("Filtered rows data: ", filteredRows);
+  console.log("Filtered rows data: ", filteredRows);
   return (
     <Card className="shadow-lg border-0 overflow-hidden w-full">
       <CardHeader className=" bg-gradient-to-r from-slate-50 to-purple-50 border-b px-4 sm:px-6 py-4">
@@ -216,7 +271,7 @@ function formatTo12Hour(timeStr?: string) {
           </div>
 
           <Button
-            onClick={downloadCSV}
+            onClick={handleDownloadCSV}
             className="bg-purple-600 hover:bg-purple-700 text-white shadow-md w-full lg:w-auto text-sm sm:text-base"
           >
             <Download className="w-4 h-4 mr-2" />
