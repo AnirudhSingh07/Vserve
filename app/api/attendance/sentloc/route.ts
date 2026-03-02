@@ -308,12 +308,18 @@ export async function POST(req: NextRequest) {
     let segmentKm = 0;
     const hasBaseline = !!employee.lastKnownCoords?.lat;
 
+    const lastUpdate = employee.lastLocationTimestamp
+      ? dayjs(employee.lastLocationTimestamp).tz("Asia/Kolkata")
+      : null;
+    const isNewDay = !lastUpdate || !nowIST.isSame(lastUpdate, "day");
+
     console.log("--- DEBUG DISTANCE START ---");
     console.log("Employee found:", employee.name);
     console.log("Has Baseline:", hasBaseline);
+    console.log("Is New Day:", isNewDay);
 
-    // Testing ke liye humne !isNewDay hata diya hai
-    if (hasBaseline) {
+    // Only calculate distance if we have a baseline and it's NOT a new day
+    if (hasBaseline && !isNewDay) {
       const origin = `${employee.lastKnownCoords.lat},${employee.lastKnownCoords.lng}`;
       const destination = `${coords.lat},${coords.lng}`;
 
