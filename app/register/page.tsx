@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
+import { Eye, EyeOff } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -36,6 +37,9 @@ export default function Register() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [step, setStep] = useState(1); // Step 1 for Basic Details, Step 2 for Additional Details
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [confirmPassword, setConfirmPassword] = useState("");
 
   const handleChange = (field: string, value: string) => {
     setFormData({ ...formData, [field]: value });
@@ -103,7 +107,6 @@ export default function Register() {
 
   const handleNext = () => {
     if (step === 1) {
-      // Validate basic details before moving to step 2
       if (
         !formData.name ||
         !formData.fatherName ||
@@ -112,11 +115,17 @@ export default function Register() {
         !formData.role
       ) {
         setError("Please fill all fields in Basic Details");
-      } else {
-        setStep(2); // Move to next step
+        return; // ← add return here too so it doesn't fall through
       }
+      // ✅ NEW: Confirm password check
+      if (formData.password !== confirmPassword) {
+        setError("Passwords do not match");
+        return;
+      }
+      setError(null); // clear any previous error before moving forward
+      setStep(2);
     } else {
-      handleRegister(); // Submit the form when at step 2
+      handleRegister();
     }
   };
 
@@ -185,13 +194,45 @@ export default function Register() {
             {/* Password */}
             <div className="grid gap-2">
               <Label htmlFor="password">Password</Label>
+            <div className="relative">
               <Input
                 id="password"
-                type="password"
+                type={showPassword ? "text" : "password"}
                 placeholder="Enter password"
                 value={formData.password}
                 onChange={(e) => handleChange("password", e.target.value)}
+                className="pr-10"
               />
+              <button
+                type="button"
+                onClick={() => setShowPassword((prev) => !prev)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+              >
+                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+              </button>
+            </div>
+            </div>
+
+            {/* Confirm Password */}
+            <div className="grid gap-2">
+              <Label htmlFor="confirmPassword">Confirm Password</Label>
+              <div className="relative">
+                <Input
+                  id="confirmPassword"
+                  type={showConfirmPassword ? "text" : "password"}
+                  placeholder="Re-enter your password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  className="pr-10"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowConfirmPassword((prev) => !prev)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                >
+                  {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                </button>
+              </div>
             </div>
           </>
         )}

@@ -15,6 +15,9 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
+// Add Eye, EyeOff to existing imports at the top
+import { Eye, EyeOff } from "lucide-react";
+
 export default function Login() {
   const router = useRouter();
   const [phone, setPhone] = useState("");
@@ -22,6 +25,7 @@ export default function Login() {
   const [role, setRole] = useState<"executive">("executive");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showPassword, setShowPassword] = useState(false);
 
   // ✅ Check if user is already authenticated
   useEffect(() => {
@@ -114,20 +118,29 @@ export default function Login() {
             />
           </div>
 
+
           <div className="grid gap-2">
             <Label htmlFor="password" className="text-gray-700">
               Password
             </Label>
+          <div className="relative">
             <Input
               id="password"
-              type="password"
+              type={showPassword ? "text" : "password"}
               placeholder="Enter your password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="rounded-lg focus-visible:ring-blue-500"
+              className="rounded-lg focus-visible:ring-blue-500 pr-10"
             />
+            <button
+              type="button"
+              onClick={() => setShowPassword((prev) => !prev)}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+            >
+              {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+            </button>
           </div>
-
+          </div>
 
           {error && (
             <p className="text-sm text-red-600 text-center font-medium">

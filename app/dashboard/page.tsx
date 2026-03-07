@@ -133,7 +133,6 @@ export default function DashboardPage() {
     };
     forceRequestLocation();
     fetchUserAndStatus();
-    forceRequestLocation();
   }, []);
 
   // ✅ Universal Location Watcher
@@ -251,7 +250,6 @@ export default function DashboardPage() {
       setCheckedIn(false);
       setPath([]);
       setShow(false);
-      setTimeout(() => setShow(true), 5000);
       alert("✅ Checked out successfully!");
     } catch (err: any) {
       alert("❌ Check-out failed: " + err.message);
@@ -335,13 +333,21 @@ export default function DashboardPage() {
 
     setIsRequestingPermission(true); // Start loading
 
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        console.log("Success!", pos);
-        setCoords({ lat: pos.coords.latitude, lng: pos.coords.longitude });
-        setPermissionError(null);
-        setIsRequestingPermission(false); // Stop loading success
-      },
+   // AFTER (fixed - also calculates and sets `inside`)
+navigator.geolocation.getCurrentPosition(
+  (pos) => {
+    console.log("Success!", pos);
+    const c = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+    setCoords(c);
+
+    // ✅ FIX: Calculate inside here too, not just in the Capacitor watcher
+    const insideIndore = haversineMeters(c, OFFICE_CENTER) <= OFFICE_RADIUS_METERS;
+    const insideBhopal = haversineMeters(c, BHOPAL_OFFICE_CENTER) <= OFFICE_RADIUS_METERS;
+    setInside(insideIndore || insideBhopal);
+
+    setPermissionError(null);
+    setIsRequestingPermission(false);
+  },
       (err) => {
         console.error(err);
         if (err.code === 1)
@@ -473,16 +479,15 @@ export default function DashboardPage() {
                 );
               }
 
-              if (!checkedIn) {
+              if (canCheckIn && show) {
                 return (
                   <button
                     onClick={handleCheckIn}
                     disabled={!canCheckIn}
-                    className={`px-6 py-3 rounded-full text-sm font-medium text-white transition ${
-                      canCheckIn
-                        ? "bg-blue-600 hover:bg-blue-700"
-                        : "bg-gray-400 cursor-not-allowed"
-                    }`}
+                    className={`px-6 py-3 rounded-full text-sm font-medium text-white transition ${canCheckIn
+                      ? "bg-blue-600 hover:bg-blue-700"
+                      : "bg-gray-400 cursor-not-allowed"
+                      }`}
                   >
                     Check In
                   </button>
@@ -501,11 +506,10 @@ export default function DashboardPage() {
                   <button
                     onClick={() => setShowCheckoutModal(true)} // Open modal instead
                     disabled={!checkedIn}
-                    className={`px-6 py-3 rounded-full text-sm font-medium text-white transition ${
-                      checkedIn
+                    className={`px-6 py-3 rounded-full text-sm font-medium text-white transition ${checkedIn
                         ? "bg-red-600 hover:bg-red-700"
                         : "bg-gray-400 cursor-not-allowed"
-                    }`}
+                      }`}
                   >
                     Check Out
                   </button>
@@ -525,11 +529,10 @@ export default function DashboardPage() {
                   <button
                     onClick={handleSendLocation}
                     disabled={isSendingLocation} // Disabled when loading
-                    className={`px-6 py-3 rounded-full text-sm font-medium text-white transition ${
-                      isSendingLocation
+                    className={`px-6 py-3 rounded-full text-sm font-medium text-white transition ${isSendingLocation
                         ? "bg-green-400 cursor-wait"
                         : "bg-green-600 hover:bg-green-700"
-                    }`}
+                      }`}
                   >
                     {isSendingLocation ? "Sending..." : "Send Location"}
                   </button>
