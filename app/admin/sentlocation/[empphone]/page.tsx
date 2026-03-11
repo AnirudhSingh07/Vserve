@@ -25,6 +25,7 @@ type SentLocationType = {
   _id: string;
   employeeId: string;
   date: string;
+  hashalt?: boolean;
   coords: {
     lat: number;
     lng: number;
@@ -283,10 +284,20 @@ const SentLocation = ({ params }: { params: { empphone: string } }) => {
               {[...locations].reverse().map((item, index) => (
                 <div
                   key={index}
-                  className="group relative overflow-hidden rounded-2xl bg-white shadow-sm transition-all duration-300 hover:shadow-lg ring-1 ring-slate-200 hover:ring-blue-100"
+                  className={`group relative overflow-hidden rounded-2xl shadow-sm transition-all duration-300 hover:shadow-lg ring-1 ${
+                    item.hashalt
+                      ? "bg-yellow-50 ring-yellow-400 hover:ring-yellow-500"
+                      : "bg-white ring-slate-200 hover:ring-blue-100"
+                  }`}
                 >
                   {/* Card Header Gradient */}
-                  <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-500 to-indigo-500 opacity-0 transition-opacity group-hover:opacity-100" />
+                  <div
+                    className={`absolute top-0 left-0 right-0 h-1 bg-gradient-to-r opacity-0 transition-opacity group-hover:opacity-100 ${
+                      item.hashalt
+                        ? "from-yellow-400 to-orange-400"
+                        : "from-blue-500 to-indigo-500"
+                    }`}
+                  />
 
                   <div className="overflow-x-auto">
                     <div className="flex items-center justify-between gap-4 p-5 min-w-max">
@@ -297,12 +308,17 @@ const SentLocation = ({ params }: { params: { empphone: string } }) => {
                             <Clock className="h-5 w-5" />
                           </div>
                           <div>
-                            <p className="text-xl font-bold text-slate-900 whitespace-nowrap">
+                            <p className="text-xl font-bold text-slate-900 whitespace-nowrap flex items-center gap-2">
                               {new Date(item.date).toLocaleTimeString("en-IN", {
                                 timeZone: "Asia/Kolkata",
                                 hour: "2-digit",
                                 minute: "2-digit",
                               })}
+                              {item.hashalt && (
+                                <span className="inline-flex items-center rounded-md bg-yellow-100 px-2 py-1 text-xs font-semibold text-yellow-800 ring-1 ring-inset ring-yellow-600/20">
+                                  Halt
+                                </span>
+                              )}
                             </p>
                             <p className="text-xs text-slate-500 flex items-center gap-1 whitespace-nowrap">
                               <Calendar className="h-3 w-3" />

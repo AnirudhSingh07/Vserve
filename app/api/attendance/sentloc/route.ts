@@ -292,7 +292,7 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     await connectDB();
-    const { phone, coords } = await req.json();
+    const { phone, coords, hashalt } = await req.json();
 
     const employee = await Employee.findOne({ phone });
     if (!employee)
@@ -367,6 +367,7 @@ export async function POST(req: NextRequest) {
     const sentLocation = await SentLocation.create({
       employeeId: employee._id,
       date: timestamp,
+      hashalt: !!hashalt,
       coords: {
         lat: coords.lat,
         lng: coords.lng,

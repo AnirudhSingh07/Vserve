@@ -56,6 +56,7 @@ export default function DashboardPage() {
 
   // ✅ New Loading States
   const [isSendingLocation, setIsSendingLocation] = useState(false);
+  const [isSendingHaltLocation, setIsSendingHaltLocation] = useState(false);
   const [isRequestingPermission, setIsRequestingPermission] = useState(false);
 
   // ✅ NEW: Checkout Modal State
@@ -324,6 +325,75 @@ export default function DashboardPage() {
     }
   };
 
+  // ✅ Handle Sent Location 2 (Halt Location) with Loading State
+  const handleSendHaltLocation = async () => {
+    if (!coords || !userData?.phone) {
+      alert("Location or user missing");
+      return;
+    }
+
+    setIsSendingHaltLocation(true); // Start loading
+
+    try {
+      // 1️⃣ Check check-in status from backend
+      const statusRes = await fetch("/api/attendance/ischeckin", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phone: userData.phone }),
+      });
+
+      const statusData = await statusRes.json();
+
+      if (!statusData.success) {
+        throw new Error(statusData.error || "Failed to verify check-in status");
+      }
+
+      // 2️⃣ Auto check-in ONLY if not checked in
+      if (!statusData.checkedIn) {
+        const checkinRes = await fetch("/api/attendance/checkin", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            phone: userData.phone,
+            coords,
+          }),
+        });
+
+        const checkinData = await checkinRes.json();
+
+        if (
+          !checkinData.success &&
+          !checkinData.error?.toLowerCase().includes("already")
+        ) {
+          throw new Error(checkinData.error || "Auto check-in failed");
+        }
+      }
+      // 3️⃣ Send location with hashalt flag
+      const locRes = await fetch("/api/attendance/sentloc", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          phone: userData.phone,
+          coords,
+          hashalt: true,
+        }),
+      });
+
+      const locData = await locRes.json();
+
+      if (!locData.success) {
+        throw new Error(locData.error || "Failed to send location");
+      }
+
+      alert("📍 Location sent successfully!");
+    } catch (err: any) {
+      console.error("Send location error:", err);
+      alert("❌ Failed to send location: " + err.message);
+    } finally {
+      setIsSendingHaltLocation(false); // Stop loading
+    }
+  };
+
   // ✅ Updated: Force Request Location with Loading State
   const forceRequestLocation = () => {
     if (!("geolocation" in navigator)) {
@@ -525,17 +595,31 @@ navigator.geolocation.getCurrentPosition(
               if (!withinTime) return null;
               return (
                 show && (
-                  // ✅ Updated Send Location Button
-                  <button
-                    onClick={handleSendLocation}
-                    disabled={isSendingLocation} // Disabled when loading
-                    className={`px-6 py-3 rounded-full text-sm font-medium text-white transition ${isSendingLocation
-                        ? "bg-green-400 cursor-wait"
-                        : "bg-green-600 hover:bg-green-700"
-                      }`}
-                  >
-                    {isSendingLocation ? "Sending..." : "Send Location"}
-                  </button>
+                  <>
+                    {/* ✅ Updated Send Location Button */}
+                    <button
+                      onClick={handleSendLocation}
+                      disabled={isSendingLocation || isSendingHaltLocation} // Disabled when loading
+                      className={`px-6 py-3 rounded-full text-sm font-medium text-white transition ${isSendingLocation
+                          ? "bg-green-400 cursor-wait"
+                          : "bg-green-600 hover:bg-green-700"
+                        }`}
+                    >
+                      {isSendingLocation ? "Sending..." : "Send Location"}
+                    </button>
+
+                    {/* ✅ Sent Location 2 Button */}
+                    <button
+                      onClick={handleSendHaltLocation}
+                      disabled={isSendingHaltLocation || isSendingLocation} // Disabled when loading
+                      className={`px-6 py-3 rounded-full text-sm font-medium text-slate-900 transition shadow-sm ${isSendingHaltLocation
+                          ? "bg-yellow-300 cursor-wait opacity-70"
+                          : "bg-yellow-400 hover:bg-yellow-500"
+                        }`}
+                    >
+                      {isSendingHaltLocation ? "Sending..." : "Sent Location 2"}
+                    </button>
+                  </>
                 )
               );
             })()}

@@ -105,60 +105,262 @@ export default function AttendanceLogs({
     return d.toISOString().split("T")[0];
   }
 
+  // ─── NEW: Work Duration Report CSV Download ─────────────────────────────────
   const handleDownloadCSV = () => {
-    const headers = [
-      "Name",
-      "Phone",
-      "Date",
-      "Status",
-      "Check-In",
-      "Check-Out",
-      "Location",
-      "Department",
-    ];
+    // Helper: parse time string (12h or 24h) → total minutes from midnight
+    function parseTimeToMinutes(timeStr?: string): number | null {
+      if (!timeStr || timeStr === "—") return null;
 
-    const csvRows = filteredRows.map((row) => {
-      // Compute status using the same logic as the table
-      let status = "--";
-      if (row.checkIn) {
-        const [hours, minutes] = row.checkIn.split(":").map(Number);
-        const checkInMinutes = hours * 60 + minutes;
-        const nineAM = 9 * 60;
-        const tenAM = 10 * 60;
-        status =
-          checkInMinutes < nineAM || checkInMinutes > tenAM
-            ? "Late"
-            : "On-time";
+      let hours = 0;
+      let minutes = 0;
+
+      if (
+        timeStr.toLowerCase().includes("am") ||
+        timeStr.toLowerCase().includes("pm")
+      ) {
+        // 12-hour format: "10:21 AM" / "02:27 PM"
+        const [timePart, meridiem] = timeStr.trim().split(" ");
+        const [h, m] = timePart.split(":").map(Number);
+        hours = meridiem.toUpperCase() === "PM" && h !== 12 ? h + 12 : h;
+        if (meridiem.toUpperCase() === "AM" && h === 12) hours = 0;
+        minutes = m;
+      } else {
+        // 24-hour format: "09:48" / "09:48:00"
+        const parts = timeStr.split(":");
+        hours = parseInt(parts[0], 10);
+        minutes = parseInt(parts[1], 10);
       }
 
-      return [
-        row.name,
-        row.phone,
-        extractDate(row.date), // DD/MM/YYYY format
-        status, // "On-time" / "Late" / "--"
-        formatTo12Hour(row.checkIn), // 12-hour format
-        formatTo12Hour(row.checkOut), // 12-hour format
-        row.location || "—",
-        row.department || "—",
-      ]
-        .map((val) => `"${String(val).replace(/"/g, '""')}"`)
-        .join(",");
+      return hours * 60 + minutes;
+    }
+
+    // Helper: compute HH:MM duration between checkIn and checkOut
+    function computeDuration(checkIn?: string, checkOut?: string): string {
+      const inMin = parseTimeToMinutes(checkIn);
+      const outMin = parseTimeToMinutes(checkOut);
+      if (inMin === null || outMin === null) return "00:00";
+      const diff = outMin - inMin;
+      if (diff <= 0) return "00:00";
+      const h = Math.floor(diff / 60);
+      const m = diff % 60;
+      return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+    }
+
+    // Helper: convert any time string to 12-hour format (e.g. "02:27 PM")
+    function toReportTime(timeStr?: string): string {
+      if (!timeStr || timeStr === "—") return "";
+
+      let hours = 0;
+      let minutes = 0;
+
+      const lower = timeStr.toLowerCase();
+      if (lower.includes("am") || lower.includes("pm")) {
+        // Already 12-hour: "10:21 AM" or "2:27 PM"
+        const isPM = lower.includes("pm");
+        const timePart = timeStr.trim().split(" ")[0]; // "10:21"
+        const parts = timePart.split(":");
+        hours = parseInt(parts[0], 10);
+        minutes = parseInt(parts[1], 10);
+        // Normalise to 24h first so we can re-format consistently
+        if (isPM && hours !== 12) hours += 12;
+        if (!isPM && hours === 12) hours = 0;
+      } else {
+        // 24-hour string: "14:27" or "14:27:00"
+        const parts = timeStr.split(":");
+        hours = parseInt(parts[0], 10);
+        minutes = parseInt(parts[1], 10);
+      }
+
+      const ampm = hours >= 12 ? "PM" : "AM";
+      const h12 = hours % 12 === 0 ? 12 : hours % 12;
+      return `${String(h12).padStart(2, "0")}:${String(minutes).padStart(2, "0")} ${ampm}`;
+    }
+
+    // Helper: escape CSV cell value
+    function cell(val: string): string {
+      return `"${String(val).replace(/"/g, '""')}"`;
+    }
+
+    // ── Step 1: Generate ALL dates in the full range (min → max) ───────────
+    const DAY_ABBR = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
+
+    const presentDates = filteredRows
+      .map((r) => normalizeDate(r.date))
+      .filter(Boolean);
+
+    if (presentDates.length === 0) return;
+
+    const minDate = presentDates.reduce((a, b) => (a < b ? a : b));
+    const maxDate = presentDates.reduce((a, b) => (a > b ? a : b));
+
+    // Walk every calendar day from minDate to maxDate
+    const allDates: string[] = [];
+    const cursor = new Date(minDate + "T00:00:00Z");
+    const end = new Date(maxDate + "T00:00:00Z");
+    while (cursor <= end) {
+      allDates.push(cursor.toISOString().split("T")[0]);
+      cursor.setUTCDate(cursor.getUTCDate() + 1);
+    }
+
+    // Helper: is a date a Sunday?
+    function isSunday(d: string): boolean {
+      return new Date(d + "T00:00:00Z").getUTCDay() === 0;
+    }
+
+    // ── Step 2: Build date column headers: "10 Tu" style ───────────────────
+    const dateColHeaders = allDates.map((d) => {
+      const dt = new Date(d + "T00:00:00Z");
+      const dayNum = dt.getUTCDate();
+      const dayAbbr = DAY_ABBR[dt.getUTCDay()];
+      return `${dayNum} ${dayAbbr}`;
     });
 
-    const csvContent = [headers.join(","), ...csvRows].join("\n");
+    // ── Step 3: Group rows by employee (phone as unique key) ───────────────
+    const employeeMap = new Map<string, AttendanceRow[]>();
+    filteredRows.forEach((row) => {
+      if (!employeeMap.has(row.phone)) employeeMap.set(row.phone, []);
+      employeeMap.get(row.phone)!.push(row);
+    });
+
+    // ── Step 4: Build CSV lines ─────────────────────────────────────────────
+    const lines: string[] = [];
+
+    // Top header row: fixed cols + date cols + summary cols
+    const fixedCols = ["Name", "Phone", "Department", "Row"];
+    const summaryCols = ["P", "A", "WO", "Working Days"];
+    lines.push(
+      [
+        ...fixedCols.map(cell),
+        ...dateColHeaders.map(cell),
+        ...summaryCols.map(cell),
+      ].join(",")
+    );
+
+    // One block per employee
+    employeeMap.forEach((rows) => {
+      const name = rows[0].name?.trim() || "—";
+      const phone = rows[0].phone || "—";
+      const dept = rows[0].department?.trim() || "—";
+
+      // Build quick lookup: normalizedDate → row
+      const dateMap = new Map<string, AttendanceRow>();
+      rows.forEach((r) => dateMap.set(normalizeDate(r.date), r));
+
+      // Compute summary counts
+      let presentCount = 0;
+      let absentCount = 0;
+      let woCount = 0;
+      allDates.forEach((d) => {
+        if (isSunday(d)) {
+          woCount++;
+        } else {
+          const r = dateMap.get(d);
+          if (r && r.checkIn) presentCount++;
+          else absentCount++;
+        }
+      });
+      const workingDays = presentCount;
+
+      // ── Row A: Employee header (name, phone, dept, blank date cells, summary)
+      lines.push(
+        [
+          cell(name),
+          cell(phone),
+          cell(dept),
+          cell(""), // Row label cell blank for emp header
+          ...allDates.map(() => cell("")),
+          cell(String(presentCount)),
+          cell(String(absentCount)),
+          cell(String(woCount)),
+          cell(String(workingDays)),
+        ].join(",")
+      );
+
+      // ── Row B: Status (P = present, A = absent, WO = Sunday)
+      lines.push(
+        [
+          cell(""),
+          cell(""),
+          cell(""),
+          cell("Status"),
+          ...allDates.map((d) => {
+            if (isSunday(d)) return cell("WO");
+            const r = dateMap.get(d);
+            if (!r) return cell("A");
+            return cell(r.checkIn ? "P" : "A");
+          }),
+          ...summaryCols.map(() => cell("")),
+        ].join(",")
+      );
+
+      // ── Row C: InTime
+      lines.push(
+        [
+          cell(""),
+          cell(""),
+          cell(""),
+          cell("InTime"),
+          ...allDates.map((d) => {
+            if (isSunday(d)) return cell("WO");
+            const r = dateMap.get(d);
+            return cell(r ? toReportTime(r.checkIn) : "");
+          }),
+          ...summaryCols.map(() => cell("")),
+        ].join(",")
+      );
+
+      // ── Row D: OutTime
+      lines.push(
+        [
+          cell(""),
+          cell(""),
+          cell(""),
+          cell("OutTime"),
+          ...allDates.map((d) => {
+            if (isSunday(d)) return cell("WO");
+            const r = dateMap.get(d);
+            return cell(r ? toReportTime(r.checkOut) : "");
+          }),
+          ...summaryCols.map(() => cell("")),
+        ].join(",")
+      );
+
+      // ── Row E: Total (work duration)
+      lines.push(
+        [
+          cell(""),
+          cell(""),
+          cell(""),
+          cell("Total"),
+          ...allDates.map((d) => {
+            if (isSunday(d)) return cell("WO");
+            const r = dateMap.get(d);
+            return cell(r ? computeDuration(r.checkIn, r.checkOut) : "");
+          }),
+          ...summaryCols.map(() => cell("")),
+        ].join(",")
+      );
+
+      // Blank separator row between employees
+      lines.push("");
+    });
+
+    // ── Step 5: Trigger download ────────────────────────────────────────────
+    const csvContent = lines.join("\n");
     const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
     link.setAttribute(
       "download",
-      `attendance_${dateFilterType}_${new Date().toISOString().split("T")[0]}.csv`,
+      `attendance_${dateFilterType}_${new Date().toISOString().split("T")[0]}.csv`
     );
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
   };
+  // ─── END: Work Duration Report CSV Download ──────────────────────────────
 
   const handleRowClick = (phone: string, date: string) => {
     const formattedDate = date.split("T")[0].split(" ")[0];
