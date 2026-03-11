@@ -325,7 +325,7 @@ export default function DashboardPage() {
     }
   };
 
-  // ✅ Handle Sent Location 2 (Halt Location) with Loading State
+  // ✅ Handle Halt Location  (Halt Location) with Loading State
   const handleSendHaltLocation = async () => {
     if (!coords || !userData?.phone) {
       alert("Location or user missing");
@@ -608,7 +608,7 @@ navigator.geolocation.getCurrentPosition(
                       {isSendingLocation ? "Sending..." : "Send Location"}
                     </button>
 
-                    {/* ✅ Sent Location 2 Button */}
+                    {/* ✅ Halt Location Button */}
                     <button
                       onClick={handleSendHaltLocation}
                       disabled={isSendingHaltLocation || isSendingLocation} // Disabled when loading
@@ -617,7 +617,7 @@ navigator.geolocation.getCurrentPosition(
                           : "bg-yellow-400 hover:bg-yellow-500"
                         }`}
                     >
-                      {isSendingHaltLocation ? "Sending..." : "Sent Location 2"}
+                      {isSendingHaltLocation ? "Sending..." : "Halt Location"}
                     </button>
                   </>
                 )
