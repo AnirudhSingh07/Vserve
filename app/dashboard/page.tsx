@@ -607,7 +607,7 @@ export default function DashboardPage() {
                     >
                       {isSendingLocation
                         ? "Sending..."
-                        : (inside && canCheckIn ? "Send Location" : "Check-in/Start")
+                        : (checkedIn ? "Send Location" : "Check-in/Start")
                       }
                     </button>
 
