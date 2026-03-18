@@ -10,8 +10,14 @@ import './globals.css'
 export const metadata: Metadata = {
   title: 'Vserve',
   description: 'Vserve',
-  generator: 'v0.app',
+  generator: 'vserve',
+  icons: {
+    icon: '/vserve.jpeg', // default favicon
+    shortcut: '/vserve.jpeg',
+    apple: '/vserve.jpeg', // optional (for iOS)
+  },
 }
+
 
 export default function RootLayout({
   children,

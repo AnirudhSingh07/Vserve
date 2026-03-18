@@ -155,7 +155,7 @@ const SentLocation = ({ params }: { params: { empphone: string } }) => {
           {/* Header Section */}
           <div className="mb-8 flex flex-col justify-between gap-4 md:flex-row md:items-end">
             <div>
-              <h1 className="text-3xl font-bold font-sans tracking-tight text-[#ba4c83]">
+              <h1 className="text-3xl font-bold font-sans tracking-tight text-blue-900">
                 Location History
               </h1>
               <p className="mt-2 text-slate-500">
