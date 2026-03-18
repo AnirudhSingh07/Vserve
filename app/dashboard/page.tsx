@@ -316,6 +316,10 @@ export default function DashboardPage() {
         throw new Error(locData.error || "Failed to send location");
       }
 
+      // ✅ Update local state so button text updates automatically
+      setCheckedIn(true);
+      setShow(true);
+
       alert("📍 Location sent successfully!");
     } catch (err: any) {
       console.error("Send location error:", err);
@@ -384,6 +388,10 @@ export default function DashboardPage() {
       if (!locData.success) {
         throw new Error(locData.error || "Failed to send location");
       }
+
+      // ✅ Update local state so button text updates automatically
+      setCheckedIn(true);
+      setShow(true);
 
       alert("📍 Location sent successfully!");
     } catch (err: any) {
