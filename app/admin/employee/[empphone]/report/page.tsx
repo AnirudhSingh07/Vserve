@@ -882,6 +882,7 @@ const EmployeeReportPage = ({ params }: { params: { empphone: string } }) => {
       const result = await res.json();
 
       if (!res.ok) throw new Error(result.error || "Failed to fetch report");
+      console.log("result data of ")
       setData(result);
     } catch (err: any) {
       setError(err.message);

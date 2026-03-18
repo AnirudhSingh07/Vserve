@@ -3,6 +3,7 @@ import mongoose from "mongoose";
 import Employee from "@/models/employee";
 import DailyDistance, { IDailyDistance } from "@/models/dailydistance";
 import SentLocation from "@/models/sentLocation";
+import Attendance from "@/models/attendance";
 import dayjs from "dayjs";
 import utc from "dayjs/plugin/utc";
 import timezone from "dayjs/plugin/timezone";
@@ -69,14 +70,48 @@ export async function GET(req: NextRequest) {
     // 📍 Fetch sent locations
     const locations = await SentLocation.find(query).sort({ date: 1 }).lean();
 
-    // console.log("Locations found:", locations.length, "for date:", targetDateStr);
+    // 📍 Fetch attendance for checkin / checkout
+    const attendance = await Attendance.findOne({
+      employee: employee._id,
+      date: { $gte: start, $lte: end },
+    }).lean() as any;
+
+    const allLocations: any[] = [...locations];
+
+    if (attendance) {
+      if (attendance.checkInTime && attendance.checkInLocation) {
+        allLocations.push({
+          _id: attendance._id.toString() + "_in",
+          employeeId: employee._id,
+          date: attendance.checkInTime,
+          coords: attendance.checkInLocation,
+          isCheckIn: true,
+        });
+      }
+      if (attendance.checkOutTime && attendance.checkOutLocation) {
+        allLocations.push({
+          _id: attendance._id.toString() + "_out",
+          employeeId: employee._id,
+          date: attendance.checkOutTime,
+          coords: attendance.checkOutLocation,
+          isCheckOut: true,
+        });
+      }
+    }
+
+    // Sort all locations by date ascending
+    allLocations.sort(
+      (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
+    );
+
+    // console.log("Locations found:", allLocations.length, "for date:", targetDateStr);
 
     return NextResponse.json({
       employee,
       success: true,
       totalDistanceKm,
-      count: locations.length,
-      data: locations,
+      count: allLocations.length,
+      data: allLocations,
     });
   } catch (error) {
     console.error("Fetch SentLocation Error:", error);

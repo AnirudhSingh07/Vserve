@@ -62,8 +62,8 @@ export default function DashboardPage() {
   // ✅ NEW: Checkout Modal State
   const [showCheckoutModal, setShowCheckoutModal] = useState(false);
 
-  const WORK_START_HOUR = 9; // 9:00 AM
-  const WORK_END_HOUR = 20; // 8:00 PM
+  const WORK_START_HOUR = 0; // 9:00 AM
+  const WORK_END_HOUR = 24; // 8:00 PM
 
   const mapRef = useRef<google.maps.Map | null>(null);
 
@@ -403,21 +403,21 @@ export default function DashboardPage() {
 
     setIsRequestingPermission(true); // Start loading
 
-   // AFTER (fixed - also calculates and sets `inside`)
-navigator.geolocation.getCurrentPosition(
-  (pos) => {
-    console.log("Success!", pos);
-    const c = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-    setCoords(c);
+    // AFTER (fixed - also calculates and sets `inside`)
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        console.log("Success!", pos);
+        const c = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+        setCoords(c);
 
-    // ✅ FIX: Calculate inside here too, not just in the Capacitor watcher
-    const insideIndore = haversineMeters(c, OFFICE_CENTER) <= OFFICE_RADIUS_METERS;
-    const insideBhopal = haversineMeters(c, BHOPAL_OFFICE_CENTER) <= OFFICE_RADIUS_METERS;
-    setInside(insideIndore || insideBhopal);
+        // ✅ FIX: Calculate inside here too, not just in the Capacitor watcher
+        const insideIndore = haversineMeters(c, OFFICE_CENTER) <= OFFICE_RADIUS_METERS;
+        const insideBhopal = haversineMeters(c, BHOPAL_OFFICE_CENTER) <= OFFICE_RADIUS_METERS;
+        setInside(insideIndore || insideBhopal);
 
-    setPermissionError(null);
-    setIsRequestingPermission(false);
-  },
+        setPermissionError(null);
+        setIsRequestingPermission(false);
+      },
       (err) => {
         console.error(err);
         if (err.code === 1)
@@ -577,8 +577,8 @@ navigator.geolocation.getCurrentPosition(
                     onClick={() => setShowCheckoutModal(true)} // Open modal instead
                     disabled={!checkedIn}
                     className={`px-6 py-3 rounded-full text-sm font-medium text-white transition ${checkedIn
-                        ? "bg-red-600 hover:bg-red-700"
-                        : "bg-gray-400 cursor-not-allowed"
+                      ? "bg-red-600 hover:bg-red-700"
+                      : "bg-gray-400 cursor-not-allowed"
                       }`}
                   >
                     Check Out
@@ -596,22 +596,25 @@ navigator.geolocation.getCurrentPosition(
               return (
                 show && (
                   <>
-                    {/* ✅ Updated Send Location Button */}
+                    {/* ✅ Updated Send Location Button with Dynamic Text */}
                     <button
                       onClick={handleSendLocation}
-                      disabled={isSendingLocation || isSendingHaltLocation} // Disabled when loading
+                      disabled={isSendingLocation || isSendingHaltLocation}
                       className={`px-6 py-3 rounded-full text-sm font-medium text-white transition ${isSendingLocation
                           ? "bg-green-400 cursor-wait"
                           : "bg-green-600 hover:bg-green-700"
                         }`}
                     >
-                      {isSendingLocation ? "Sending..." : "Send Location"}
+                      {isSendingLocation
+                        ? "Sending..."
+                        : (inside && canCheckIn ? "Send Location" : "Check-in/Start")
+                      }
                     </button>
 
                     {/* ✅ Halt Location Button */}
                     <button
                       onClick={handleSendHaltLocation}
-                      disabled={isSendingHaltLocation || isSendingLocation} // Disabled when loading
+                      disabled={isSendingHaltLocation || isSendingLocation}
                       className={`px-6 py-3 rounded-full text-sm font-medium text-slate-900 transition shadow-sm ${isSendingHaltLocation
                           ? "bg-yellow-300 cursor-wait opacity-70"
                           : "bg-yellow-400 hover:bg-yellow-500"

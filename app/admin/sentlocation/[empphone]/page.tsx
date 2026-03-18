@@ -26,6 +26,8 @@ type SentLocationType = {
   employeeId: string;
   date: string;
   hashalt?: boolean;
+  isCheckIn?: boolean;
+  isCheckOut?: boolean;
   coords: {
     lat: number;
     lng: number;
@@ -285,7 +287,11 @@ const SentLocation = ({ params }: { params: { empphone: string } }) => {
                 <div
                   key={index}
                   className={`group relative overflow-hidden rounded-2xl shadow-sm transition-all duration-300 hover:shadow-lg ring-1 ${
-                    item.hashalt
+                    item.isCheckIn
+                      ? "bg-green-50 ring-green-400 hover:ring-green-500"
+                      : item.isCheckOut
+                      ? "bg-red-50 ring-red-400 hover:ring-red-500"
+                      : item.hashalt
                       ? "bg-yellow-50 ring-yellow-400 hover:ring-yellow-500"
                       : "bg-white ring-slate-200 hover:ring-blue-100"
                   }`}
@@ -293,7 +299,11 @@ const SentLocation = ({ params }: { params: { empphone: string } }) => {
                   {/* Card Header Gradient */}
                   <div
                     className={`absolute top-0 left-0 right-0 h-1 bg-gradient-to-r opacity-0 transition-opacity group-hover:opacity-100 ${
-                      item.hashalt
+                      item.isCheckIn
+                        ? "from-green-400 to-emerald-500"
+                        : item.isCheckOut
+                        ? "from-red-400 to-rose-500"
+                        : item.hashalt
                         ? "from-yellow-400 to-orange-400"
                         : "from-blue-500 to-indigo-500"
                     }`}
@@ -314,7 +324,17 @@ const SentLocation = ({ params }: { params: { empphone: string } }) => {
                                 hour: "2-digit",
                                 minute: "2-digit",
                               })}
-                              {item.hashalt && (
+                              {item.isCheckIn && (
+                                <span className="inline-flex items-center rounded-md bg-green-100 px-2 py-1 text-xs font-semibold text-green-800 ring-1 ring-inset ring-green-600/20">
+                                  Check In
+                                </span>
+                              )}
+                              {item.isCheckOut && (
+                                <span className="inline-flex items-center rounded-md bg-red-100 px-2 py-1 text-xs font-semibold text-red-800 ring-1 ring-inset ring-red-600/20">
+                                  Check Out
+                                </span>
+                              )}
+                              {item.hashalt && !item.isCheckIn && !item.isCheckOut && (
                                 <span className="inline-flex items-center rounded-md bg-yellow-100 px-2 py-1 text-xs font-semibold text-yellow-800 ring-1 ring-inset ring-yellow-600/20">
                                   Halt
                                 </span>
