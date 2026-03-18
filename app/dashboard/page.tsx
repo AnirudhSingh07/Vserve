@@ -63,7 +63,7 @@ export default function DashboardPage() {
   const [showCheckoutModal, setShowCheckoutModal] = useState(false);
 
   const WORK_START_HOUR = 0; // 9:00 AM
-  const WORK_END_HOUR = 24; // 8:00 PM
+  const WORK_END_HOUR = 23.59; // 8:00 PM
 
   const mapRef = useRef<google.maps.Map | null>(null);
 
