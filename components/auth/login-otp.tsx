@@ -82,7 +82,7 @@ export default function Login() {
       <CardHeader className="space-y-3">
         <div className="flex items-center justify-center">
           <Image
-            src="/images/logo.png"
+            src="/logo.jpeg"
             alt="Company Logo"
             width={125}
             height={80}
