@@ -19,6 +19,22 @@ import Image from "next/image";
 export default function Register() {
   const router = useRouter();
 
+  const DEPARTMENTS = [
+    "Sales",
+    "IT",
+    "Marketing",
+    "HR",
+    "Operations",
+    "Finance",
+    "Design",
+    "Support",
+    "Manager",
+    "Team Leader",
+    "Telecaller",
+    "Field Executive",
+    "Backend Executive",
+  ];
+
   const [formData, setFormData] = useState({
     phone: "",
     password: "",
@@ -285,14 +301,21 @@ export default function Register() {
             {/* department */}
             <div className="grid gap-2">
               <Label htmlFor="department">Department</Label>
-              <input
-                type="text"
-                placeholder="Enter department"
+              <Select
                 value={formData.department}
-                name="department"
-                id="department"
-                onChange={(e) => handleChange("department", e.target.value)}
-              />
+                onValueChange={(value) => handleChange("department", value)}
+              >
+                <SelectTrigger id="department">
+                  <SelectValue placeholder="Select department" />
+                </SelectTrigger>
+                <SelectContent>
+                  {DEPARTMENTS.map((dept) => (
+                    <SelectItem key={dept} value={dept}>
+                      {dept}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
             {/* location */}
@@ -310,6 +333,9 @@ export default function Register() {
                 <SelectContent>
                   <SelectItem value="Indore">Indore</SelectItem>
                   <SelectItem value="Bhopal">Bhopal</SelectItem>
+                  <SelectItem value="Sehore">Sehore</SelectItem>
+                  <SelectItem value="Pithampur">Pithampur</SelectItem>
+                  <SelectItem value="Hoshangabad">Hoshangabad</SelectItem>
                 </SelectContent>
               </Select>
             </div>

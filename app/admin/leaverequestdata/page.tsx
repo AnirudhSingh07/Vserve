@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import {
   ChevronDown,
   ChevronUp,
@@ -16,7 +16,7 @@ import dayjs from "dayjs";
 import utc from "dayjs/plugin/utc";
 import timezone from "dayjs/plugin/timezone";
 import Navbar from "@/components/Navbar";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Plus } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 
@@ -61,9 +61,43 @@ export default function AdminLeaveDashboard() {
   } | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
 
+  // Manual Leave State
+  const [employees, setEmployees] = useState<any[]>([]);
+  const [isManualModalOpen, setIsManualModalOpen] = useState(false);
+  const [manualForm, setManualForm] = useState({
+    employeePhone: "",
+    date: dayjs().tz(IST_TIMEZONE).format("YYYY-MM-DD"),
+    shift: "Morning" as "Morning" | "Afternoon",
+  });
+  const [manualLoading, setManualLoading] = useState(false);
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setDropdownOpen(false);
+      }
+    };
+    if (dropdownOpen) document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [dropdownOpen]);
+
   useEffect(() => {
     fetchRequests();
+    fetchEmployees();
   }, []);
+
+  const fetchEmployees = async () => {
+    try {
+      const res = await fetch("/api/employees");
+      const data = await res.json();
+      setEmployees(data.employees || []);
+    } catch (err) {
+      console.error("Failed to fetch employees", err);
+    }
+  };
 
   const fetchRequests = async () => {
     try {
@@ -108,6 +142,64 @@ export default function AdminLeaveDashboard() {
 
     return data;
   }, [allRequests, filterType, searchQuery]);
+
+  const handleAssignManualLeave = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!manualForm.employeePhone) return alert("Please select an employee.");
+    setManualLoading(true);
+
+    try {
+      // 1. Create a Leave Request
+      const createRes = await fetch("/api/notification/leavereq", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          phoneNo: manualForm.employeePhone,
+          leaveFrom: manualForm.date,
+          leaveTo: manualForm.date,
+          numberOfDays: 0.5,
+          halfDaySlot: manualForm.shift,
+          subject: "Admin Assigned Leave",
+          message: "Automatically approved by administrator.",
+        }),
+      });
+
+      const createData = await createRes.json();
+      if (!createRes.ok || !createData.data) {
+        throw new Error(createData.error || "Failed to create leave request");
+      }
+
+      // 2. Immediately Approve It
+      const createdRequest = createData.data;
+      const approveRes = await fetch("/api/notification/leavestatus", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          requestId: createdRequest._id,
+          employeeId: createdRequest.employeeId,
+          action: "accept",
+        }),
+      });
+
+      if (!approveRes.ok) {
+        throw new Error("Failed to auto-approve leave request");
+      }
+
+      // Success
+      setIsManualModalOpen(false);
+      setManualForm({
+        employeePhone: "",
+        date: dayjs().tz(IST_TIMEZONE).format("YYYY-MM-DD"),
+        shift: "Morning",
+      });
+      fetchRequests(); // Refresh the list entirely
+    } catch (err: any) {
+      console.error(err);
+      alert(err.message || "An error occurred");
+    } finally {
+      setManualLoading(false);
+    }
+  };
 
   const handleStatusAction = async () => {
     if (!confirmModal) return;
@@ -179,35 +271,44 @@ export default function AdminLeaveDashboard() {
           </div>
 
           {/* Search & Filter Toolbar */}
-          <div className="flex flex-col sm:flex-row gap-3">
-            <div className="relative">
-              <Search
-                className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
-                size={16}
-              />
-              <input
-                type="text"
-                placeholder="Search employee..."
-                className="pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500 w-full sm:w-64 shadow-sm"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-              />
-            </div>
+          <div className="flex flex-col xl:flex-row gap-3 items-start xl:items-center">
+            <button
+              onClick={() => setIsManualModalOpen(true)}
+              className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl text-sm transition-all focus:ring-2 focus:ring-indigo-500 shadow-sm flex items-center justify-center gap-2 whitespace-nowrap self-start sm:self-auto xl:mr-2"
+            >
+              <Plus size={16} />
+              Assign Leave
+            </button>
+            <div className="flex flex-col sm:flex-row gap-3">
+              <div className="relative">
+                <Search
+                  className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+                  size={16}
+                />
+                <input
+                  type="text"
+                  placeholder="Search employee..."
+                  className="pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500 w-full xl:w-64 shadow-sm"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                />
+              </div>
 
-            <div className="flex items-center gap-2 bg-white p-1 rounded-xl border border-slate-200 shadow-sm">
-              {(["all", "pending", "today", "approved"] as const).map((tab) => (
-                <button
-                  key={tab}
-                  onClick={() => setFilterType(tab)}
-                  className={`px-4 py-1.5 rounded-lg text-xs font-bold capitalize transition-all ${
-                    filterType === tab
-                      ? "bg-slate-900 text-white shadow-md"
-                      : "text-slate-500 hover:bg-slate-50 hover:text-slate-700"
-                  }`}
-                >
-                  {tab}
-                </button>
-              ))}
+              <div className="flex items-center gap-2 bg-white p-1 rounded-xl border border-slate-200 shadow-sm overflow-x-auto whitespace-nowrap scrollbar-hide">
+                {(["all", "pending", "today", "approved"] as const).map((tab) => (
+                  <button
+                    key={tab}
+                    onClick={() => setFilterType(tab)}
+                    className={`px-4 py-1.5 rounded-lg text-xs font-bold capitalize transition-all ${
+                      filterType === tab
+                        ? "bg-slate-900 text-white shadow-md"
+                        : "text-slate-500 hover:bg-slate-50 hover:text-slate-700"
+                    }`}
+                  >
+                    {tab}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
         </div>
@@ -480,6 +581,188 @@ export default function AdminLeaveDashboard() {
                   "Confirm"
                 )}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Manual Leave Request Modal */}
+      {isManualModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-slate-900/60 backdrop-blur-sm sm:p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-t-3xl sm:rounded-3xl w-full max-w-md shadow-2xl flex flex-col max-h-[90vh] sm:max-h-[85vh] transform transition-all animate-in slide-in-from-bottom-5 sm:slide-in-from-bottom-0 sm:zoom-in-95">
+            {/* Header */}
+            <div className="flex justify-between items-center p-5 sm:p-6 sm:px-7 border-b border-slate-100 shrink-0">
+              <h3 className="text-lg sm:text-xl font-extrabold text-slate-900">
+                Assign Half-Day Leave
+              </h3>
+              <button
+                onClick={() => setIsManualModalOpen(false)}
+                className="text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-full p-2 transition-colors"
+                type="button"
+              >
+                <XCircle size={24} className="sm:w-5 sm:h-5" />
+              </button>
+            </div>
+
+            {/* Scrollable Form Body */}
+            <div className="overflow-y-auto p-5 sm:p-6 sm:px-7">
+              <form onSubmit={handleAssignManualLeave} className="space-y-5 sm:space-y-6">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wide mb-2">
+                    Select Employee *
+                  </label>
+
+                  {/* Trigger button */}
+                  <div ref={dropdownRef} className="relative">
+                    <button
+                      type="button"
+                      onClick={() => setDropdownOpen(!dropdownOpen)}
+                      className="w-full flex items-center justify-between px-4 py-3.5 sm:py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-700 outline-none focus:ring-2 focus:ring-indigo-500 transition-shadow"
+                    >
+                      <span className="truncate pr-4 text-left font-medium">
+                        {manualForm.employeePhone
+                          ? (() => {
+                              const sel = employees.find((e) => e.phone === manualForm.employeePhone);
+                              return sel ? `${sel.name} (${sel.department || "No Dept"})` : "-- Select an Employee --";
+                            })()
+                          : <span className="text-slate-400">-- Select an Employee --</span>}
+                      </span>
+                      <ChevronDown
+                        size={16}
+                        className={`text-slate-400 shrink-0 transition-transform duration-200 ${dropdownOpen ? "rotate-180" : ""}`}
+                      />
+                    </button>
+
+                    {/* Desktop inline dropdown (sm and above) */}
+                    {dropdownOpen && (
+                      <div className="hidden sm:block absolute z-[70] top-full left-0 w-full mt-2 bg-white border border-slate-100 rounded-xl shadow-2xl ring-1 ring-black/5 max-h-56 overflow-y-auto animate-in fade-in zoom-in-95 duration-150">
+                        {employees.length === 0 ? (
+                          <div className="px-4 py-5 text-center text-sm text-slate-400">No employees found</div>
+                        ) : employees.map((emp) => (
+                          <div
+                            key={emp._id}
+                            onClick={() => { setManualForm({ ...manualForm, employeePhone: emp.phone }); setDropdownOpen(false); }}
+                            className={`flex flex-col px-4 py-3 cursor-pointer border-b border-slate-50 last:border-b-0 transition-colors hover:bg-slate-50 ${
+                              manualForm.employeePhone === emp.phone ? "bg-indigo-50/60" : ""
+                            }`}
+                          >
+                            <span className="font-bold text-slate-800 text-sm truncate">{emp.name}</span>
+                            <span className="text-[11px] text-slate-500">{emp.department || "No Dept"} • {emp.phone}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Mobile bottom-sheet (below sm) */}
+                  {dropdownOpen && (
+                    <div
+                      className="sm:hidden fixed inset-0 z-[100] bg-black/40 flex items-end"
+                      onClick={() => setDropdownOpen(false)}
+                    >
+                      <div
+                        className="w-full bg-white rounded-t-3xl max-h-[70vh] overflow-y-auto animate-in slide-in-from-bottom-4 duration-200"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 sticky top-0 bg-white z-10">
+                          <h4 className="font-extrabold text-slate-900 text-base">Select Employee</h4>
+                          <button
+                            type="button"
+                            onClick={() => setDropdownOpen(false)}
+                            className="p-2 rounded-full hover:bg-slate-100 text-slate-400"
+                          >
+                            <XCircle size={20} />
+                          </button>
+                        </div>
+                        <div className="divide-y divide-slate-50">
+                          {employees.length === 0 ? (
+                            <div className="px-5 py-10 text-center text-sm text-slate-400">No employees found</div>
+                          ) : employees.map((emp) => (
+                            <div
+                              key={emp._id}
+                              onClick={() => { setManualForm({ ...manualForm, employeePhone: emp.phone }); setDropdownOpen(false); }}
+                              className={`flex items-center gap-4 px-5 py-4 cursor-pointer active:bg-slate-100 transition-colors ${
+                                manualForm.employeePhone === emp.phone ? "bg-indigo-50" : ""
+                              }`}
+                            >
+                              <div className="h-10 w-10 rounded-full bg-indigo-100 text-indigo-700 font-extrabold text-base flex items-center justify-center shrink-0">
+                                {emp.name?.charAt(0)}
+                              </div>
+                              <div className="flex flex-col min-w-0">
+                                <span className="font-bold text-slate-800 text-sm truncate">{emp.name}</span>
+                                <span className="text-xs text-slate-500">{emp.department || "No Dept"} • {emp.phone}</span>
+                              </div>
+                              {manualForm.employeePhone === emp.phone && (
+                                <CheckCircle2 size={18} className="text-indigo-600 ml-auto shrink-0" />
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                        <div className="h-6 shrink-0" />
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wide mb-2">
+                    Leave Date *
+                  </label>
+                  <input
+                    type="date"
+                    required
+                    value={manualForm.date}
+                    onChange={(e) =>
+                      setManualForm({ ...manualForm, date: e.target.value })
+                    }
+                    className="w-full px-4 py-3.5 sm:py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-700 outline-none focus:ring-2 focus:ring-indigo-500 transition-shadow"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wide mb-2">
+                    Shift Slot *
+                  </label>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+                    <button
+                      type="button"
+                      onClick={() => setManualForm({ ...manualForm, shift: "Morning" })}
+                      className={`py-3.5 sm:py-3 rounded-xl border font-bold text-sm transition-all flex justify-center items-center gap-2 ${
+                        manualForm.shift === "Morning"
+                          ? "bg-indigo-50 border-indigo-500 text-indigo-700 ring-2 ring-indigo-500/20"
+                          : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50 hover:border-slate-300"
+                      }`}
+                    >
+                      <span className="text-lg">☀️</span> Morning
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setManualForm({ ...manualForm, shift: "Afternoon" })}
+                      className={`py-3.5 sm:py-3 rounded-xl border font-bold text-sm transition-all flex justify-center items-center gap-2 ${
+                        manualForm.shift === "Afternoon"
+                          ? "bg-indigo-50 border-indigo-500 text-indigo-700 ring-2 ring-indigo-500/20"
+                          : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50 hover:border-slate-300"
+                      }`}
+                    >
+                      <span className="text-lg">🌤️</span> Afternoon
+                    </button>
+                  </div>
+                </div>
+
+                <div className="pt-2 sm:pt-0 pb-2 sm:pb-0">
+                  <button
+                    type="submit"
+                    disabled={manualLoading}
+                    className="w-full py-4 sm:py-3.5 bg-slate-900 text-white text-base sm:text-sm font-extrabold rounded-xl shadow-lg shadow-slate-300 transition-all hover:bg-indigo-600 active:scale-[0.98] flex justify-center items-center"
+                  >
+                    {manualLoading ? (
+                      <div className="animate-spin h-5 w-5 border-2 border-white border-t-transparent rounded-full" />
+                    ) : (
+                      "Confirm & Auto-Approve"
+                    )}
+                  </button>
+                </div>
+              </form>
             </div>
           </div>
         </div>

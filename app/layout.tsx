@@ -16,7 +16,7 @@ export const metadata: Metadata = {
     shortcut: '/vserve.jpeg',
     apple: '/vserve.jpeg', // optional (for iOS)
   },
-}
+} 
 
 
 export default function RootLayout({

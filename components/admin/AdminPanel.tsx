@@ -54,6 +54,9 @@ export default function AdminPanel() {
   // 🔹 ADDED: store raw attendance separately
   const [rawAttendance, setRawAttendance] = useState<any[]>([]);
 
+  // 🔹 ADDED: daily distance map — "phone__YYYY-MM-DD" → totalKm
+  const [dailyDistanceMap, setDailyDistanceMap] = useState<Record<string, number>>({});
+
   // 🔹 ADDED: employee phone → location map
   const employeeLocationMap = useMemo(() => {
     const map: Record<string, string> = {};
@@ -69,10 +72,13 @@ export default function AdminPanel() {
     const fetchData = async () => {
       try {
         setLoading(true);
-        const [adminRes, empRes] = await Promise.all([
+        const [adminRes, empRes, distRes] = await Promise.all([
           fetch("/api/me", { credentials: "include" }),
           fetch("/api/employees"),
+          fetch("/api/attendance/daily-distance"),
         ]);
+
+        
 
         if (!adminRes.ok) throw new Error("Failed to fetch admin data");
         if (!empRes.ok) throw new Error("Failed to fetch employee list");
@@ -83,13 +89,19 @@ export default function AdminPanel() {
         setAdmin(adminData.employee || null);
         setUsers(empData.employees || []);
 
+        // 🔹 ADDED: store daily distance map
+        if (distRes.ok) {
+          const distData = await distRes.json();
+          setDailyDistanceMap(distData.distanceMap || {});
+        }
+
         const attRes = await fetch("/api/attendance/allattendance", {
           credentials: "include",
         });
 
         if (attRes.ok) {
           const data = await attRes.json();
-   
+
           // 🔹 ADDED: store raw attendance only
           setRawAttendance(data.data || []);
         }
@@ -209,7 +221,7 @@ export default function AdminPanel() {
           </button>
         </div>
 
-        <AttendanceLogs attRows={attRows} downloadCSV={downloadCSV} />
+        <AttendanceLogs attRows={attRows} downloadCSV={downloadCSV} totalEmployees={users.length} dailyDistanceMap={dailyDistanceMap} />
       </div>
     </div>
   );

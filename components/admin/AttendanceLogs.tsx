@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useState , useEffect} from "react";
 import { Card, CardHeader, CardContent, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
@@ -13,6 +13,8 @@ import {
   AlertCircle,
   Search,
   ArrowRight,
+  Loader2,
+  MapPin,
 } from "lucide-react";
 
 type AttendanceRow = {
@@ -29,17 +31,89 @@ type AttendanceRow = {
 interface AttendanceLogsProps {
   attRows: AttendanceRow[];
   downloadCSV: () => void;
+  totalEmployees?: number;
+  // Map of "phone__YYYY-MM-DD" → totalKm for the daily distance column
+  dailyDistanceMap?: Record<string, number>;
 }
+
+const LocationCountCell = ({ phone, date }: { phone: string; date: string }) => {
+  const [count, setCount] = useState<number | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  // Replicate the exact date formatting used in handleRowClick
+  const formattedDate = date.split("T")[0].split(" ")[0];
+
+  useEffect(() => {
+    let isMounted = true;
+    const fetchLocations = async () => {
+      try {
+        const res = await fetch(
+          `/api/attendance/sentloc?phone=${phone}&date=${formattedDate}`
+        );
+        if (res.ok) {
+          const result = await res.json();
+          if (result.success && result.data) {
+            // Get total location length and subtract the ones we don't want
+            const totalLocations = result.data.length;
+            const invalidLocations = result.data.filter(
+              (loc: any) => loc.isCheckIn || loc.isCheckOut || loc.hashalt
+            ).length;
+            
+            const validCount = totalLocations - invalidLocations;
+            
+            if (isMounted) setCount(validCount);
+          } else {
+            if (isMounted) setCount(0);
+          }
+        } else {
+          if (isMounted) setCount(0);
+        }
+      } catch (err) {
+        if (isMounted) setCount(0);
+      } finally {
+        if (isMounted) setLoading(false);
+      }
+    };
+
+    fetchLocations();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [phone, formattedDate]);
+
+  if (loading) {
+    return <Loader2 className="w-4 h-4 animate-spin text-slate-300" />;
+  }
+
+  if (count === 0 || count === null) {
+    return <span className="text-gray-400">--</span>;
+  }
+
+  return (
+    <span className="inline-flex items-center gap-1 text-gray-700 ">
+      {count}
+    </span>
+  );
+};
 
 type DateFilterType = "today" | "yesterday" | "date" | "range" | "all";
 
 export default function AttendanceLogs({
   attRows,
   downloadCSV,
+  totalEmployees,
+  dailyDistanceMap = {},
 }: AttendanceLogsProps) {
   const router = useRouter();
   const [search, setSearch] = useState("");
   const [dateFilterType, setDateFilterType] = useState<DateFilterType>("today");
+
+  const [allReportMonth, setAllReportMonth] = useState(() => {
+    return new Date().toISOString().slice(0, 7);
+  });
+  const [isDownloadingAll, setIsDownloadingAll] = useState(false);
+  const [isDownloadingCSV, setIsDownloadingCSV] = useState(false);
 
   const [selectedDate, setSelectedDate] = useState(() => {
     return new Date().toISOString().split("T")[0];
@@ -95,6 +169,11 @@ export default function AttendanceLogs({
     return date.toISOString().split("T")[0];
   }
 
+  // Build the lookup key used in dailyDistanceMap
+  function buildDistanceKey(phone: string, date: string): string {
+    return `${phone}__${normalizeDate(date)}`;
+  }
+
   function getTodayDate() {
     return new Date().toISOString().split("T")[0];
   }
@@ -105,8 +184,79 @@ export default function AttendanceLogs({
     return d.toISOString().split("T")[0];
   }
 
+  // ─── NEW: All Employees Monthly Report Download ────────────────────────────
+  const handleDownloadAllEmployeesReport = async () => {
+    try {
+      setIsDownloadingAll(true);
+      const res = await fetch(`/api/reports/all-employees-activity?startMonth=${allReportMonth}&endMonth=${allReportMonth}`);
+      const data = await res.json();
+
+      if (!res.ok || !data.success) {
+        alert("Failed to fetch data: " + (data.error || "Unknown error"));
+        return;
+      }
+
+      // Convert to CSV
+      const rows = [];
+      // Header
+      rows.push([
+        "Name", "Phone", "Department", "Role",
+        "Total Month Days", "Present Days", "Week Offs", "On-Time", "Late",
+        "Total Distance (km)", "Distinct Locations"
+      ].join(","));
+
+      for (const item of data.reports) {
+        const { employee, report } = item;
+        const { name, phone, department, role } = employee || {};
+        const totalMonthDays = report?.attendance?.totalDaysInMonth || 0;
+        const present = report?.attendance?.presentDays || 0;
+        const weekOffs = report?.attendance?.weekOffs || 0;
+        const onTime = report?.attendance?.status?.onTime || 0;
+        const late = report?.attendance?.status?.late || 0;
+        const dist = report?.travel?.totalDistanceKm || 0;
+        const distinct = report?.activity?.distinctLocationsVisited || 0;
+
+        const cell = (val: any) => `"${String(val || "").replace(/"/g, '""')}"`;
+        rows.push([
+          cell(name), cell(phone), cell(department), cell(role),
+          cell(totalMonthDays), cell(present), cell(weekOffs), cell(onTime), cell(late), cell(dist), cell(distinct)
+        ].join(","));
+      }
+
+      const csvContent = rows.join("\n");
+      const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.setAttribute(
+        "download",
+        `all_employees_report_${allReportMonth}.csv`
+      );
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } catch (e: any) {
+      console.error(e);
+      alert("Error generating report");
+    } finally {
+      setIsDownloadingAll(false);
+    }
+  };
+
   // ─── NEW: Work Duration Report CSV Download ─────────────────────────────────
-  const handleDownloadCSV = () => {
+  const handleDownloadCSV = async () => {
+    try {
+      setIsDownloadingCSV(true);
+
+      // Fetch distinct locations map in bulk for the CSV to use synchronously
+      let distinctLocationsMap: Record<string, number> = {};
+      const locRes = await fetch("/api/attendance/distinct-locations");
+      if (locRes.ok) {
+        const locData = await locRes.json();
+        distinctLocationsMap = locData.locationMap || {};
+      }
+
     // Helper: parse time string (12h or 24h) → total minutes from midnight
     function parseTimeToMinutes(timeStr?: string): number | null {
       if (!timeStr || timeStr === "—") return null;
@@ -182,13 +332,14 @@ export default function AttendanceLogs({
     }
 
     // ── Step 1: Generate ALL dates in the full range (min → max) ───────────
-    const DAY_ABBR = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
-
     const presentDates = filteredRows
       .map((r) => normalizeDate(r.date))
       .filter(Boolean);
 
-    if (presentDates.length === 0) return;
+    if (presentDates.length === 0) {
+      setIsDownloadingCSV(false);
+      return;
+    }
 
     const minDate = presentDates.reduce((a, b) => (a < b ? a : b));
     const maxDate = presentDates.reduce((a, b) => (a > b ? a : b));
@@ -207,145 +358,79 @@ export default function AttendanceLogs({
       return new Date(d + "T00:00:00Z").getUTCDay() === 0;
     }
 
-    // ── Step 2: Build date column headers: "10 Tu" style ───────────────────
-    const dateColHeaders = allDates.map((d) => {
-      const dt = new Date(d + "T00:00:00Z");
-      const dayNum = dt.getUTCDate();
-      const dayAbbr = DAY_ABBR[dt.getUTCDay()];
-      return `${dayNum} ${dayAbbr}`;
-    });
-
-    // ── Step 3: Group rows by employee (phone as unique key) ───────────────
+    // ── Step 2: Group rows by employee (phone as unique key) ───────────────
     const employeeMap = new Map<string, AttendanceRow[]>();
     filteredRows.forEach((row) => {
       if (!employeeMap.has(row.phone)) employeeMap.set(row.phone, []);
       employeeMap.get(row.phone)!.push(row);
     });
 
-    // ── Step 4: Build CSV lines ─────────────────────────────────────────────
+    // ── Step 3: Build Flat CSV lines ─────────────────────────────────────────────
     const lines: string[] = [];
 
-    // Top header row: fixed cols + date cols + summary cols
-    const fixedCols = ["Name", "Phone", "Department", "Row"];
-    const summaryCols = ["P", "A", "WO", "Working Days"];
+    // Flat Top Header
     lines.push(
       [
-        ...fixedCols.map(cell),
-        ...dateColHeaders.map(cell),
-        ...summaryCols.map(cell),
+        "Name",
+        "Phone",
+        "Department",
+        "Employee Location",
+        "Date",
+        "Status",
+        "Check-In",
+        "Check-Out",
+        "Work Duration",
+        "Km Distance",
       ].join(",")
     );
 
-    // One block per employee
+    // One row per active date per employee
     employeeMap.forEach((rows) => {
       const name = rows[0].name?.trim() || "—";
       const phone = rows[0].phone || "—";
       const dept = rows[0].department?.trim() || "—";
+      const empLocation = rows[0].location?.trim() || "—"; // Base Location
 
       // Build quick lookup: normalizedDate → row
       const dateMap = new Map<string, AttendanceRow>();
       rows.forEach((r) => dateMap.set(normalizeDate(r.date), r));
 
-      // Compute summary counts
-      let presentCount = 0;
-      let absentCount = 0;
-      let woCount = 0;
       allDates.forEach((d) => {
-        if (isSunday(d)) {
-          woCount++;
-        } else {
-          const r = dateMap.get(d);
-          if (r && r.checkIn) presentCount++;
-          else absentCount++;
-        }
+        const r = dateMap.get(d);
+        
+        let status = "A";
+        if (isSunday(d)) status = "WO";
+        if (r && r.checkIn) status = "P";
+
+        const inTime = r ? toReportTime(r.checkIn) : "";
+        const outTime = r ? toReportTime(r.checkOut) : "";
+        const duration = r ? computeDuration(r.checkIn, r.checkOut) : "";
+        
+        const kmKey = buildDistanceKey(phone, d);
+        const kmValue = dailyDistanceMap[kmKey];
+        const distanceStr = (kmValue !== undefined && kmValue !== null) ? kmValue.toFixed(2) : "—";
+        
+        const locKey = `${phone}__${d}`;
+        const locationCount = distinctLocationsMap[locKey];
+
+        lines.push(
+          [
+            cell(name),
+            cell(phone),
+            cell(dept),
+            cell(empLocation),
+            cell(d),
+            cell(status),
+            cell(inTime),
+            cell(outTime),
+            cell(duration),
+            cell(distanceStr),
+          ].join(",")
+        );
       });
-      const workingDays = presentCount;
-
-      // ── Row A: Employee header (name, phone, dept, blank date cells, summary)
-      lines.push(
-        [
-          cell(name),
-          cell(phone),
-          cell(dept),
-          cell(""), // Row label cell blank for emp header
-          ...allDates.map(() => cell("")),
-          cell(String(presentCount)),
-          cell(String(absentCount)),
-          cell(String(woCount)),
-          cell(String(workingDays)),
-        ].join(",")
-      );
-
-      // ── Row B: Status (P = present, A = absent, WO = Sunday)
-      lines.push(
-        [
-          cell(""),
-          cell(""),
-          cell(""),
-          cell("Status"),
-          ...allDates.map((d) => {
-            if (isSunday(d)) return cell("WO");
-            const r = dateMap.get(d);
-            if (!r) return cell("A");
-            return cell(r.checkIn ? "P" : "A");
-          }),
-          ...summaryCols.map(() => cell("")),
-        ].join(",")
-      );
-
-      // ── Row C: InTime
-      lines.push(
-        [
-          cell(""),
-          cell(""),
-          cell(""),
-          cell("InTime"),
-          ...allDates.map((d) => {
-            if (isSunday(d)) return cell("WO");
-            const r = dateMap.get(d);
-            return cell(r ? toReportTime(r.checkIn) : "");
-          }),
-          ...summaryCols.map(() => cell("")),
-        ].join(",")
-      );
-
-      // ── Row D: OutTime
-      lines.push(
-        [
-          cell(""),
-          cell(""),
-          cell(""),
-          cell("OutTime"),
-          ...allDates.map((d) => {
-            if (isSunday(d)) return cell("WO");
-            const r = dateMap.get(d);
-            return cell(r ? toReportTime(r.checkOut) : "");
-          }),
-          ...summaryCols.map(() => cell("")),
-        ].join(",")
-      );
-
-      // ── Row E: Total (work duration)
-      lines.push(
-        [
-          cell(""),
-          cell(""),
-          cell(""),
-          cell("Total"),
-          ...allDates.map((d) => {
-            if (isSunday(d)) return cell("WO");
-            const r = dateMap.get(d);
-            return cell(r ? computeDuration(r.checkIn, r.checkOut) : "");
-          }),
-          ...summaryCols.map(() => cell("")),
-        ].join(",")
-      );
-
-      // Blank separator row between employees
-      lines.push("");
     });
 
-    // ── Step 5: Trigger download ────────────────────────────────────────────
+    // ── Step 4: Trigger download ────────────────────────────────────────────
     const csvContent = lines.join("\n");
     const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
@@ -353,12 +438,19 @@ export default function AttendanceLogs({
     link.href = url;
     link.setAttribute(
       "download",
-      `attendance_${dateFilterType}_${new Date().toISOString().split("T")[0]}.csv`
+      `work_duration_report_${dateFilterType}_${new Date().toISOString().split("T")[0]}.csv`
     );
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
+    
+    } catch (e: any) {
+      console.error(e);
+      alert("Error generating CSV");
+    } finally {
+      setIsDownloadingCSV(false);
+    }
   };
   // ─── END: Work Duration Report CSV Download ──────────────────────────────
 
@@ -390,11 +482,21 @@ export default function AttendanceLogs({
       );
     });
 
+  const todayDate = getTodayDate();
+  const todayAttendedPhones = new Set(
+    attRows
+      .filter((r) => normalizeDate(r.date) === todayDate && r.checkIn)
+      .map((r) => r.phone)
+  );
+  const totalAttendanceToday = todayAttendedPhones.size;
+  const totalEmployeesCount = totalEmployees || 0;
+  const remainingToday = Math.max(0, totalEmployeesCount - totalAttendanceToday);
+
   console.log("Filtered rows data: ", filteredRows);
   return (
     <Card className="shadow-lg border-0 overflow-hidden w-full">
       <CardHeader className=" bg-gradient-to-r from-slate-50 to-purple-50 border-b px-4 sm:px-6 py-4">
-        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+        <div className="flex flex-col 2xl:flex-row 2xl:items-center 2xl:justify-between gap-4">
           <div className="flex items-center gap-3">
             <div className="bg-purple-100 p-2 rounded-lg flex-shrink-0">
               <Clock className="w-5 h-5 sm:w-6 sm:h-6 text-purple-600" />
@@ -409,77 +511,124 @@ export default function AttendanceLogs({
             </div>
           </div>
 
-          <div className="flex flex-col xl:flex-row gap-2 w-full xl:w-auto">
-            <div className="relative w-full xl:w-64">
-              <Search className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" />
-              <input
-                type="text"
-                placeholder="Search name, phone, date..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="w-full pl-9 pr-3 py-2 text-sm border rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
-              />
+          <div className="flex flex-col xl:flex-row xl:items-center gap-3 w-full 2xl:w-auto">
+            {/* Search and Date Filters */}
+            <div className="flex flex-col sm:flex-row gap-2 w-full xl:w-auto items-stretch sm:items-center">
+              <div className="relative w-full sm:w-56 lg:w-64 flex-shrink-0">
+                <Search className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" />
+                <input
+                  type="text"
+                  placeholder="Search name, phone, date..."
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="w-full pl-9 pr-3 py-2 text-sm border rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 bg-white"
+                />
+              </div>
+
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
+                <select
+                  value={dateFilterType}
+                  onChange={(e) =>
+                    setDateFilterType(e.target.value as DateFilterType)
+                  }
+                  className="px-3 py-2 w-full sm:w-auto text-sm border rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 bg-white"
+                >
+                  <option value="today">Today</option>
+                  <option value="yesterday">Yesterday</option>
+                  <option value="date">Specific Date</option>
+                  <option value="range">Date Range</option>
+                  <option value="all">All Time</option>
+                </select>
+
+                {dateFilterType === "date" && (
+                  <div className="w-full sm:w-40 flex-shrink-0">
+                    <input
+                      type="date"
+                      value={selectedDate}
+                      onChange={(e) => setSelectedDate(e.target.value)}
+                      className="w-full px-3 py-2 text-sm border rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 bg-white"
+                    />
+                  </div>
+                )}
+
+                {dateFilterType === "range" && (
+                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
+                    <div className="w-full sm:w-36 flex-shrink-0">
+                      <input
+                        type="date"
+                        value={fromDate}
+                        onChange={(e) => setFromDate(e.target.value)}
+                        className="w-full px-2 py-2 text-sm border rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 bg-white"
+                      />
+                    </div>
+                    <ArrowRight className="w-4 h-4 text-gray-400 hidden sm:block flex-shrink-0 mx-auto" />
+                    <div className="w-full sm:w-36 flex-shrink-0">
+                      <input
+                        type="date"
+                        value={toDate}
+                        onChange={(e) => setToDate(e.target.value)}
+                        min={fromDate}
+                        className="w-full px-2 py-2 text-sm border rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 bg-white"
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
 
-            <div className="flex flex-col sm:flex-row gap-2">
-              <select
-                value={dateFilterType}
-                onChange={(e) =>
-                  setDateFilterType(e.target.value as DateFilterType)
-                }
-                className="px-3 py-2 text-sm border rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+            {/* Action Buttons */}
+            <div className="flex flex-col m-5 sm:flex-row items-stretch sm:items-center gap-2 w-full xl:w-auto flex-shrink-0 xl:border-l xl:border-gray-200 xl:pl-3">
+              <div className="flex bg-white sm:bg-slate-100 gap-5 rounded-md sm:rounded-lg items-center text-sm w-full sm:w-auto border sm:border-0">
+                <input
+                  type="month"
+                  value={allReportMonth}
+                  onChange={(e) => setAllReportMonth(e.target.value)}
+                  className="pl-2 py-1.5 bg-transparent border-none text-sm w-full sm:w-32 focus:outline-none font-medium text-slate-700 flex-1"
+                />
+                <Button
+                  onClick={handleDownloadAllEmployeesReport}
+                  disabled={isDownloadingAll}
+                  variant="ghost"
+                  size="sm"
+                  className="text-purple-700  hover:bg-slate-200 h-8 px-3 shrink-0 bg-slate-100 sm:bg-transparent ml-2 sm:ml-0"
+                >
+                  {isDownloadingAll ? (
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  ) : (
+                    <Download className="w-4 h-4 mr-2" />
+                  )}
+                  Monthly (All)
+                </Button>
+              </div>
+
+              <Button
+                onClick={handleDownloadCSV}
+                className="bg-purple-600 m-10 hover:bg-purple-700 text-white shadow-md w-full sm:w-auto lg:h-10 shrink-0"
               >
-                <option value="today">Today</option>
-                <option value="yesterday">Yesterday</option>
-                <option value="date">Specific Date</option>
-                <option value="range">Date Range</option>
-                <option value="all">All Time</option>
-              </select>
-
-              {dateFilterType === "date" && (
-                <div className="relative w-full sm:w-40">
-                  <input
-                    type="date"
-                    value={selectedDate}
-                    onChange={(e) => setSelectedDate(e.target.value)}
-                    className="w-full px-3 py-2 text-sm border rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
-                  />
-                </div>
-              )}
-
-              {dateFilterType === "range" && (
-                <div className="flex items-center gap-2">
-                  <div className="relative w-full sm:w-36">
-                    <input
-                      type="date"
-                      value={fromDate}
-                      onChange={(e) => setFromDate(e.target.value)}
-                      className="w-full px-2 py-2 text-sm border rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
-                    />
-                  </div>
-                  <ArrowRight className="w-4 h-4 text-gray-400 hidden sm:block" />
-                  <div className="relative w-full sm:w-36">
-                    <input
-                      type="date"
-                      value={toDate}
-                      onChange={(e) => setToDate(e.target.value)}
-                      min={fromDate}
-                      className="w-full px-2 py-2 text-sm border rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
-                    />
-                  </div>
-                </div>
-              )}
+                <Download className="w-4 h-4 mr-2" />
+                Today Report
+              </Button>
             </div>
           </div>
-
-          <Button
-            onClick={handleDownloadCSV}
-            className="bg-purple-600 hover:bg-purple-700 text-white shadow-md w-full lg:w-auto text-sm sm:text-base"
-          >
-            <Download className="w-4 h-4 mr-2" />
-            Download CSV
-          </Button>
         </div>
+
+        {/* NEW Snapshot Metrics */}
+        {totalEmployees !== undefined && (
+          <div className="flex flex-wrap items-center gap-4 mt-4 pt-4 border-t border-purple-100/50">
+            <div className="bg-white/60 px-4 py-3 rounded-lg border border-purple-100 flex-1 min-w-[140px] shadow-sm">
+              <p className="text-xs text-slate-500 font-semibold uppercase tracking-wider">Total Employees</p>
+              <p className="text-2xl font-bold text-slate-800 mt-1.5">{totalEmployeesCount}</p>
+            </div>
+            <div className="bg-white/60 px-4 py-3 rounded-lg border border-green-100 flex-1 min-w-[140px] shadow-sm">
+              <p className="text-xs text-green-600 font-semibold uppercase tracking-wider">Present Today</p>
+              <p className="text-2xl font-bold text-green-700 mt-1.5">{totalAttendanceToday}</p>
+            </div>
+            <div className="bg-white/60 px-4 py-3 rounded-lg border border-orange-100 flex-1 min-w-[140px] shadow-sm">
+              <p className="text-xs text-orange-600 font-semibold uppercase tracking-wider">Remaining (Today)</p>
+              <p className="text-2xl font-bold text-orange-700 mt-1.5">{remainingToday}</p>
+            </div>
+          </div>
+        )}
       </CardHeader>
 
       <CardContent className="p-0 overflow-x-auto">
@@ -510,6 +659,13 @@ export default function AttendanceLogs({
                 </th>
                 <th className="px-3 sm:px-4 py-2 text-left text-xs sm:text-sm font-medium text-gray-500 uppercase">
                   Department
+                </th>
+                <th className="px-3 sm:px-4 py-2 text-left text-xs sm:text-sm font-medium text-gray-500 uppercase">
+                  Km
+                </th>
+                <th className="px-3 sm:px-4 py-2 text-left text-xs sm:text-sm font-medium text-gray-500 uppercase">
+                  
+                  Locations
                 </th>
               </tr>
             </thead>
@@ -570,6 +726,22 @@ export default function AttendanceLogs({
                   </td>
                   <td className="px-3 sm:px-4 py-2 text-gray-700">
                     {row.department || "—"}
+                  </td>
+                  <td className="px-3 sm:px-4 py-2">
+                    {(() => {
+                      const km = dailyDistanceMap[buildDistanceKey(row.phone, row.date)];
+                      if (km === undefined || km === null) {
+                        return <span className="text-gray-400">—</span>;
+                      }
+                      return (
+                        <span className="inline-flex items-center gap-1 text-gray-700 whitespace-nowrap">
+                          {km.toFixed(2)} km
+                        </span>
+                      );
+                    })()}
+                  </td>
+                  <td className="px-3 sm:px-4 py-2">
+                    <LocationCountCell phone={row.phone} date={row.date} />
                   </td>
                 </tr>
               ))}

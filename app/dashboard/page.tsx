@@ -58,12 +58,14 @@ export default function DashboardPage() {
   const [isSendingLocation, setIsSendingLocation] = useState(false);
   const [isSendingHaltLocation, setIsSendingHaltLocation] = useState(false);
   const [isRequestingPermission, setIsRequestingPermission] = useState(false);
+  const [isCheckingIn, setIsCheckingIn] = useState(false);
+  const [isCheckingOut, setIsCheckingOut] = useState(false);
 
   // ✅ NEW: Checkout Modal State
   const [showCheckoutModal, setShowCheckoutModal] = useState(false);
 
   const WORK_START_HOUR = 9; // 9:00 AM
-  const WORK_END_HOUR = 20; // 8:00 PM
+  const WORK_END_HOUR = 18  ; // 8:00 PM
 
   const mapRef = useRef<google.maps.Map | null>(null);
 
@@ -217,7 +219,7 @@ export default function DashboardPage() {
 
   const handleCheckIn = async () => {
     if (!coords || !userData?.phone) return alert("Location or user missing");
-
+    setIsCheckingIn(true);
     try {
       const res = await fetch("/api/attendance/checkin", {
         method: "POST",
@@ -233,12 +235,14 @@ export default function DashboardPage() {
       alert("✅ Checked in successfully!");
     } catch (err: any) {
       alert("❌ Check-in failed: " + err.message);
+    } finally {
+      setIsCheckingIn(false);
     }
   };
 
   const handleCheckOut = async () => {
     if (!coords || !userData?.phone) return alert("Location or user missing");
-
+    setIsCheckingOut(true);
     try {
       const res = await fetch("/api/attendance/checkout", {
         method: "POST",
@@ -254,6 +258,8 @@ export default function DashboardPage() {
       alert("✅ Checked out successfully!");
     } catch (err: any) {
       alert("❌ Check-out failed: " + err.message);
+    } finally {
+      setIsCheckingOut(false);
     }
   };
 
@@ -561,13 +567,19 @@ export default function DashboardPage() {
                 return (
                   <button
                     onClick={handleCheckIn}
-                    disabled={!canCheckIn}
-                    className={`px-6 py-3 rounded-full text-sm font-medium text-white transition ${canCheckIn
-                      ? "bg-blue-600 hover:bg-blue-700"
-                      : "bg-gray-400 cursor-not-allowed"
-                      }`}
+                    disabled={!canCheckIn || isCheckingIn}
+                    className={`px-6 py-3 rounded-full text-sm font-medium text-white transition flex items-center gap-2 ${
+                      isCheckingIn
+                        ? "bg-blue-400 cursor-wait"
+                        : canCheckIn
+                        ? "bg-blue-600 hover:bg-blue-700"
+                        : "bg-gray-400 cursor-not-allowed"
+                    }`}
                   >
-                    Check In
+                    {isCheckingIn && (
+                      <span className="inline-block h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    )}
+                    {isCheckingIn ? "Checking In..." : "Check In"}
                   </button>
                 );
               }
@@ -582,14 +594,20 @@ export default function DashboardPage() {
               return (
                 show && (
                   <button
-                    onClick={() => setShowCheckoutModal(true)} // Open modal instead
-                    disabled={!checkedIn}
-                    className={`px-6 py-3 rounded-full text-sm font-medium text-white transition ${checkedIn
-                      ? "bg-red-600 hover:bg-red-700"
-                      : "bg-gray-400 cursor-not-allowed"
-                      }`}
+                    onClick={() => setShowCheckoutModal(true)}
+                    disabled={!checkedIn || isCheckingOut}
+                    className={`px-6 py-3 rounded-full text-sm font-medium text-white transition flex items-center gap-2 ${
+                      isCheckingOut
+                        ? "bg-red-400 cursor-wait"
+                        : checkedIn
+                        ? "bg-red-600 hover:bg-red-700"
+                        : "bg-gray-400 cursor-not-allowed"
+                    }`}
                   >
-                    Check Out
+                    {isCheckingOut && (
+                      <span className="inline-block h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    )}
+                    {isCheckingOut ? "Checking Out..." : "Check Out"}
                   </button>
                 )
               );

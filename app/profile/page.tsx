@@ -22,6 +22,22 @@ export default function ProfilePage() {
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
+  const DEPARTMENTS = [
+    "Sales",
+    "IT",
+    "Marketing",
+    "HR",
+    "Operations",
+    "Finance",
+    "Design",
+    "Support",
+    "Manager",
+    "Team Leader",
+    "Telecaller",
+    "Field Executive",
+    "Backend Executive",
+  ];
+
   useEffect(() => {
     const fetchUser = async () => {
       try {
@@ -189,6 +205,9 @@ export default function ProfilePage() {
               >
                 <option value="Indore">Indore</option>
                 <option value="Bhopal">Bhopal</option>
+                <option value="Sehore">Sehore</option>
+                <option value="Pithampur">Pithampur</option>
+                <option value="Hoshangabad">Hoshangabad</option>
               </select>
 
               <button
@@ -201,7 +220,7 @@ export default function ProfilePage() {
           )}
 
           {user.role === "executive" && (
-            <div className=" mt-4">
+            <div className="mt-4">
               <form
                 onSubmit={async (e) => {
                   e.preventDefault();
@@ -226,21 +245,25 @@ export default function ProfilePage() {
                     }
                   }
                 }}
-                className="flex flex-wrap text-lg font-light items-center gap-4"
+                className="flex flex-wrap items-center gap-4"
               >
-                <label
-                  htmlFor="department"
-                  className="w-48 px-3 py-2 text-sm font-norma  border border-gray-300 rounded-lg bg-white text-gray-70l"
+                <select
+                  name="department"
+                  id="department"
+                  defaultValue={user.department || ""}
+                  className="w-48 px-3 py-2 text-sm font-normal border border-gray-300 rounded-lg bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 >
-                  Department
-                </label>
-                <input type="text" name="department" id="department" />
+                  <option value="" disabled>Select Department</option>
+                  {DEPARTMENTS.map((dept) => (
+                    <option key={dept} value={dept}>{dept}</option>
+                  ))}
+                </select>
 
                 <button
                   type="submit"
-                  className="px-12 py-2 text-sm font-medium bg-blue-500 text-white rounded-lg hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
+                  className="px-6 py-2 text-sm font-medium bg-blue-500 text-white rounded-lg hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
                 >
-                  Submit
+                  Update Department
                 </button>
               </form>
             </div>
