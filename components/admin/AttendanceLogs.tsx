@@ -15,6 +15,7 @@ import {
   ArrowRight,
   Loader2,
   MapPin,
+  User,
 } from "lucide-react";
 
 type AttendanceRow = {
@@ -31,6 +32,7 @@ type AttendanceRow = {
 interface AttendanceLogsProps {
   attRows: AttendanceRow[];
   downloadCSV: () => void;
+  users?: { name?: string; phone: string; role?: string; department?: string; location?: string }[];
   totalEmployees?: number;
   // Map of "phone__YYYY-MM-DD" → totalKm for the daily distance column
   dailyDistanceMap?: Record<string, number>;
@@ -104,6 +106,7 @@ export default function AttendanceLogs({
   downloadCSV,
   totalEmployees,
   dailyDistanceMap = {},
+  users = [],
 }: AttendanceLogsProps) {
   const router = useRouter();
   const [search, setSearch] = useState("");
@@ -336,21 +339,33 @@ export default function AttendanceLogs({
       .map((r) => normalizeDate(r.date))
       .filter(Boolean);
 
+    let allDates: string[] = [];
     if (presentDates.length === 0) {
-      setIsDownloadingCSV(false);
-      return;
-    }
+      if (dateFilterType === "today") allDates = [getTodayDate()];
+      else if (dateFilterType === "yesterday") allDates = [getYesterdayDate()];
+      else if (dateFilterType === "date") allDates = [selectedDate];
+      else if (dateFilterType === "range") {
+        const cursor = new Date(fromDate + "T00:00:00Z");
+        const end = new Date(toDate + "T00:00:00Z");
+        while (cursor <= end) {
+          allDates.push(cursor.toISOString().split("T")[0]);
+          cursor.setUTCDate(cursor.getUTCDate() + 1);
+        }
+      } else {
+        setIsDownloadingCSV(false);
+        return; // nothing to download for 'all' time if absolutely no records exist
+      }
+    } else {
+      const minDate = presentDates.reduce((a, b) => (a < b ? a : b));
+      const maxDate = presentDates.reduce((a, b) => (a > b ? a : b));
 
-    const minDate = presentDates.reduce((a, b) => (a < b ? a : b));
-    const maxDate = presentDates.reduce((a, b) => (a > b ? a : b));
-
-    // Walk every calendar day from minDate to maxDate
-    const allDates: string[] = [];
-    const cursor = new Date(minDate + "T00:00:00Z");
-    const end = new Date(maxDate + "T00:00:00Z");
-    while (cursor <= end) {
-      allDates.push(cursor.toISOString().split("T")[0]);
-      cursor.setUTCDate(cursor.getUTCDate() + 1);
+      // Walk every calendar day from minDate to maxDate
+      const cursor = new Date(minDate + "T00:00:00Z");
+      const end = new Date(maxDate + "T00:00:00Z");
+      while (cursor <= end) {
+        allDates.push(cursor.toISOString().split("T")[0]);
+        cursor.setUTCDate(cursor.getUTCDate() + 1);
+      }
     }
 
     // Helper: is a date a Sunday?
@@ -363,6 +378,13 @@ export default function AttendanceLogs({
     filteredRows.forEach((row) => {
       if (!employeeMap.has(row.phone)) employeeMap.set(row.phone, []);
       employeeMap.get(row.phone)!.push(row);
+    });
+
+    // Ensure all known active users are in the map, so they appear as marked Absent if missing
+    users.forEach((u) => {
+      if (u.phone && !employeeMap.has(u.phone)) {
+        employeeMap.set(u.phone, []);
+      }
     });
 
     // ── Step 3: Build Flat CSV lines ─────────────────────────────────────────────
@@ -385,11 +407,14 @@ export default function AttendanceLogs({
     );
 
     // One row per active date per employee
-    employeeMap.forEach((rows) => {
-      const name = rows[0].name?.trim() || "—";
-      const phone = rows[0].phone || "—";
-      const dept = rows[0].department?.trim() || "—";
-      const empLocation = rows[0].location?.trim() || "—"; // Base Location
+    employeeMap.forEach((rows, phoneKey) => {
+      // Find user details from users array or fallback to rows
+      const matchedUser = users.find(u => u.phone === phoneKey);
+      
+      const name = matchedUser?.name?.trim() || (rows[0] ? rows[0].name?.trim() : "—") || "—";
+      const phone = phoneKey;
+      const dept = matchedUser?.department?.trim() || (rows[0] ? rows[0].department?.trim() : "—") || "—";
+      const empLocation = matchedUser?.location?.trim() || (rows[0] ? rows[0].location?.trim() : "—") || "—";
 
       // Build quick lookup: normalizedDate → row
       const dateMap = new Map<string, AttendanceRow>();
@@ -491,6 +516,9 @@ export default function AttendanceLogs({
   const totalAttendanceToday = todayAttendedPhones.size;
   const totalEmployeesCount = totalEmployees || 0;
   const remainingToday = Math.max(0, totalEmployeesCount - totalAttendanceToday);
+
+  // Calculate absent employees detail today
+  const absentUsers = users.filter((u) => !todayAttendedPhones.has(u.phone));
 
   console.log("Filtered rows data: ", filteredRows);
   return (
@@ -624,7 +652,7 @@ export default function AttendanceLogs({
               <p className="text-2xl font-bold text-green-700 mt-1.5">{totalAttendanceToday}</p>
             </div>
             <div className="bg-white/60 px-4 py-3 rounded-lg border border-orange-100 flex-1 min-w-[140px] shadow-sm">
-              <p className="text-xs text-orange-600 font-semibold uppercase tracking-wider">Remaining (Today)</p>
+              <p className="text-xs text-orange-600 font-semibold uppercase tracking-wider">Absent (Today)</p>
               <p className="text-2xl font-bold text-orange-700 mt-1.5">{remainingToday}</p>
             </div>
           </div>
@@ -749,6 +777,35 @@ export default function AttendanceLogs({
           </table>
         </div>
       </CardContent>
+
+      {/* New section for Absent users today */}
+      {dateFilterType === "today" && absentUsers.length > 0 && (
+        <div className="p-4 sm:p-6 bg-orange-50/30 border-t border-orange-100/50">
+          <h3 className="text-base sm:text-lg font-semibold text-slate-800 mb-4 flex items-center gap-2">
+            <AlertCircle className="w-5 h-5 text-orange-500" />
+            Absent / Remaining Today ({absentUsers.length})
+          </h3>
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
+            {absentUsers.map((user, idx) => (
+              <div 
+                key={user.phone || idx} 
+                className="bg-white p-3 rounded-lg border border-orange-100 shadow-sm flex items-center gap-3 hover:shadow-md transition-shadow"
+              >
+                <div className="bg-orange-100 p-2 rounded-full shrink-0">
+                  <User className="w-4 h-4 text-orange-600" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-semibold text-slate-800 truncate">{user.name || "Unknown"}</p>
+                  <p className="text-xs text-slate-500 flex items-center gap-1 mt-0.5">
+                    <Phone className="w-3 h-3" />
+                    {user.phone}
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </Card>
   );
 }

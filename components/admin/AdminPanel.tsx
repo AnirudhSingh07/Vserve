@@ -221,7 +221,7 @@ export default function AdminPanel() {
           </button>
         </div>
 
-        <AttendanceLogs attRows={attRows} downloadCSV={downloadCSV} totalEmployees={users.length} dailyDistanceMap={dailyDistanceMap} />
+        <AttendanceLogs attRows={attRows} downloadCSV={downloadCSV} totalEmployees={users.length} dailyDistanceMap={dailyDistanceMap} users={users} />
       </div>
     </div>
   );
