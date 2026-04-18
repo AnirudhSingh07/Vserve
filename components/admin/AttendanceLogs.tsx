@@ -15,6 +15,7 @@ import {
   ArrowRight,
   Loader2,
   MapPin,
+  Building,
   User,
 } from "lucide-react";
 
@@ -799,6 +800,14 @@ export default function AttendanceLogs({
                   <p className="text-xs text-slate-500 flex items-center gap-1 mt-0.5">
                     <Phone className="w-3 h-3" />
                     {user.phone}
+                  </p>
+                  <p className="text-xs text-slate-500 flex items-center gap-1 mt-0.5">
+                    <Building className="w-3 h-3" />
+                    {user.department}
+                  </p>
+                  <p className="text-xs text-slate-500 flex items-center gap-1 mt-0.5">
+                    <MapPin className="w-3 h-3" />
+                    {user.location}
                   </p>
                 </div>
               </div>
