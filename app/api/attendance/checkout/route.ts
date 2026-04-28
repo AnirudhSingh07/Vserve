@@ -22,9 +22,7 @@ export async function POST(req: NextRequest) {
     if (!employee)
       return NextResponse.json({ success: false, error: "Employee not found" });
 
-    const now = dayjs();
-    
-   
+    const now = dayjs().tz("Asia/Kolkata");
     const today = now.startOf("day").toDate();
 
     // 🔍 Find today's attendance

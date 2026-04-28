@@ -122,10 +122,12 @@ export default function DashboardPage() {
         const checkoutData = await checkoutStatusRes.json();
 
         if (checkoutData.success) {
-          // If checkoutData.checkedOut is true, it means they are done.
-          // We set setShow(false) to hide the action buttons.
-          setShow(!checkoutData.checkedOut);
-          console.log("Is already checked out:", checkoutData.checkedOut);
+          // ✅ FIX: Only hide buttons if truly checked out AND NOT currently checked in.
+          // This prevents a prior day's checkout from hiding today's Check-In button.
+          const alreadyCheckedOut =
+            checkoutData.checkedOut && !statusData.checkedIn;
+          setShow(!alreadyCheckedOut);
+          console.log("Is already checked out for today:", alreadyCheckedOut);
         }
       } catch (err: any) {
         console.error("Initialization error:", err);
@@ -563,7 +565,9 @@ export default function DashboardPage() {
                 );
               }
 
-              if (canCheckIn && show) {
+              // ✅ FIX: Show Check In button whenever inside office & not yet checked in.
+              // Removed '&& show' guard — show=false must NOT block the ability to check in.
+              if (canCheckIn) {
                 return (
                   <button
                     onClick={handleCheckIn}
