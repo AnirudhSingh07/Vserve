@@ -21,6 +21,10 @@ import Navbar from "@/components/Navbar";
 export default function ProfilePage() {
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [otherLocation, setOtherLocation] = useState("");
+  const [selectedLocation, setSelectedLocation] = useState("");
+  const [otherDepartment, setOtherDepartment] = useState("");
+  const [selectedDepartment, setSelectedDepartment] = useState("");
 
   const DEPARTMENTS = [
     "Sales",
@@ -175,14 +179,13 @@ export default function ProfilePage() {
             <form
               onSubmit={async (e) => {
                 e.preventDefault();
-                const formData = new FormData(e.currentTarget);
-                console.log("Updating location...");
-                const location = formData.get("location");
-                console.log("Location:", location);
-                if (location) {
+                const resolvedLocation =
+                  selectedLocation === "Other" ? otherLocation : selectedLocation;
+                console.log("Updating location...", resolvedLocation);
+                if (resolvedLocation) {
                   const res = await fetch("/api/update-location", {
                     method: "POST",
-                    body: JSON.stringify({ location, id: user._id }),
+                    body: JSON.stringify({ location: resolvedLocation, id: user._id }),
                     headers: {
                       "Content-Type": "application/json",
                     },
@@ -198,17 +201,32 @@ export default function ProfilePage() {
               }}
               className="mt-4 flex flex-wrap items-center gap-4"
             >
-              <select
-                name="location"
-                id="location"
-                className="w-48 px-3 py-2 text-sm font-normal border border-gray-300 rounded-lg bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
-              >
-                <option value="Indore">Indore</option>
-                <option value="Bhopal">Bhopal</option>
-                <option value="Sehore">Sehore</option>
-                <option value="Pithampur">Pithampur</option>
-                <option value="Hoshangabad">Hoshangabad</option>
-              </select>
+              <div className="flex flex-col gap-2">
+                <select
+                  name="location"
+                  id="location"
+                  value={selectedLocation}
+                  onChange={(e) => setSelectedLocation(e.target.value)}
+                  className="w-48 px-3 py-2 text-sm font-normal border border-gray-300 rounded-lg bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                >
+                  <option value="">Select location</option>
+                  <option value="Indore">Indore</option>
+                  <option value="Bhopal">Bhopal</option>
+                  <option value="Sehore">Sehore</option>
+                  <option value="Pithampur">Pithampur</option>
+                  <option value="Hoshangabad">Hoshangabad</option>
+                  <option value="Other">Other</option>
+                </select>
+                {selectedLocation === "Other" && (
+                  <input
+                    type="text"
+                    placeholder="Enter your location"
+                    value={otherLocation}
+                    onChange={(e) => setOtherLocation(e.target.value)}
+                    className="w-48 px-3 py-2 text-sm font-normal border border-gray-300 rounded-lg bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                  />
+                )}
+              </div>
 
               <button
                 type="submit"
@@ -224,12 +242,12 @@ export default function ProfilePage() {
               <form
                 onSubmit={async (e) => {
                   e.preventDefault();
-                  const formData = new FormData(e.currentTarget);
-                  const department = formData.get("department");
-                  if (department) {
+                  const resolvedDepartment =
+                    selectedDepartment === "Other" ? otherDepartment : selectedDepartment;
+                  if (resolvedDepartment) {
                     const res = await fetch("/api/update-department", {
                       method: "POST",
-                      body: JSON.stringify({ department, id: user._id }),
+                      body: JSON.stringify({ department: resolvedDepartment, id: user._id }),
                       headers: {
                         "Content-Type": "application/json",
                       },
@@ -247,17 +265,30 @@ export default function ProfilePage() {
                 }}
                 className="flex flex-wrap items-center gap-4"
               >
-                <select
-                  name="department"
-                  id="department"
-                  defaultValue={user.department || ""}
-                  className="w-48 px-3 py-2 text-sm font-normal border border-gray-300 rounded-lg bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                >
-                  <option value="" disabled>Select Department</option>
-                  {DEPARTMENTS.map((dept) => (
-                    <option key={dept} value={dept}>{dept}</option>
-                  ))}
-                </select>
+                <div className="flex flex-col gap-2">
+                  <select
+                    name="department"
+                    id="department"
+                    value={selectedDepartment}
+                    onChange={(e) => setSelectedDepartment(e.target.value)}
+                    className="w-48 px-3 py-2 text-sm font-normal border border-gray-300 rounded-lg bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  >
+                    <option value="" disabled>Select Department</option>
+                    {DEPARTMENTS.map((dept) => (
+                      <option key={dept} value={dept}>{dept}</option>
+                    ))}
+                    <option value="Other">Other</option>
+                  </select>
+                  {selectedDepartment === "Other" && (
+                    <input
+                      type="text"
+                      placeholder="Enter your department"
+                      value={otherDepartment}
+                      onChange={(e) => setOtherDepartment(e.target.value)}
+                      className="w-48 px-3 py-2 text-sm font-normal border border-gray-300 rounded-lg bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    />
+                  )}
+                </div>
 
                 <button
                   type="submit"

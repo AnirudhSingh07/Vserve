@@ -49,6 +49,9 @@ export default function Register() {
     addressProof: "",
   });
 
+  const [otherLocation, setOtherLocation] = useState("");
+  const [otherDepartment, setOtherDepartment] = useState("");
+
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -102,11 +105,18 @@ export default function Register() {
 
     setLoading(true);
 
+    // Resolve "Other" selections to their custom values
+    const submitData = {
+      ...formData,
+      location: formData.location === "Other" ? otherLocation : formData.location,
+      department: formData.department === "Other" ? otherDepartment : formData.department,
+    };
+
     try {
       const res = await fetch("/api/auth/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(formData),
+        body: JSON.stringify(submitData),
       });
 
       const data = await res.json();
@@ -314,8 +324,17 @@ export default function Register() {
                       {dept}
                     </SelectItem>
                   ))}
+                  <SelectItem value="Other">Other</SelectItem>
                 </SelectContent>
               </Select>
+              {formData.department === "Other" && (
+                <Input
+                  id="otherDepartment"
+                  placeholder="Enter your department"
+                  value={otherDepartment}
+                  onChange={(e) => setOtherDepartment(e.target.value)}
+                />
+              )}
             </div>
 
             {/* location */}
@@ -336,8 +355,17 @@ export default function Register() {
                   <SelectItem value="Sehore">Sehore</SelectItem>
                   <SelectItem value="Pithampur">Pithampur</SelectItem>
                   <SelectItem value="Hoshangabad">Hoshangabad</SelectItem>
+                  <SelectItem value="Other">Other</SelectItem>
                 </SelectContent>
               </Select>
+              {formData.location === "Other" && (
+                <Input
+                  id="otherLocation"
+                  placeholder="Enter your location"
+                  value={otherLocation}
+                  onChange={(e) => setOtherLocation(e.target.value)}
+                />
+              )}
             </div>
           </>
         )}
