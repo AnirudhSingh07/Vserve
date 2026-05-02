@@ -67,10 +67,12 @@ export default function AdminLeaveDashboard() {
   const [manualForm, setManualForm] = useState({
     employeePhone: "",
     date: dayjs().tz(IST_TIMEZONE).format("YYYY-MM-DD"),
+    leaveType: "half" as "half" | "full",
     shift: "Morning" as "Morning" | "Afternoon",
   });
   const [manualLoading, setManualLoading] = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [empSearch, setEmpSearch] = useState("");
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   // Close dropdown when clicking outside
@@ -78,6 +80,7 @@ export default function AdminLeaveDashboard() {
     const handler = (e: MouseEvent) => {
       if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
         setDropdownOpen(false);
+        setEmpSearch("");
       }
     };
     if (dropdownOpen) document.addEventListener("mousedown", handler);
@@ -148,6 +151,8 @@ export default function AdminLeaveDashboard() {
     if (!manualForm.employeePhone) return alert("Please select an employee.");
     setManualLoading(true);
 
+    const isFullDay = manualForm.leaveType === "full";
+
     try {
       // 1. Create a Leave Request
       const createRes = await fetch("/api/notification/leavereq", {
@@ -157,10 +162,10 @@ export default function AdminLeaveDashboard() {
           phoneNo: manualForm.employeePhone,
           leaveFrom: manualForm.date,
           leaveTo: manualForm.date,
-          numberOfDays: 0.5,
-          halfDaySlot: manualForm.shift,
+          numberOfDays: isFullDay ? 1 : 0.5,
+          halfDaySlot: isFullDay ? undefined : manualForm.shift,
           subject: "Admin Assigned Leave",
-          message: "Automatically approved by administrator.",
+          message: `Automatically approved by administrator (${isFullDay ? "Full Day" : `Half Day – ${manualForm.shift}`}).`,
         }),
       });
 
@@ -190,6 +195,7 @@ export default function AdminLeaveDashboard() {
       setManualForm({
         employeePhone: "",
         date: dayjs().tz(IST_TIMEZONE).format("YYYY-MM-DD"),
+        leaveType: "half",
         shift: "Morning",
       });
       fetchRequests(); // Refresh the list entirely
@@ -593,7 +599,7 @@ export default function AdminLeaveDashboard() {
             {/* Header */}
             <div className="flex justify-between items-center p-5 sm:p-6 sm:px-7 border-b border-slate-100 shrink-0">
               <h3 className="text-lg sm:text-xl font-extrabold text-slate-900">
-                Assign Half-Day Leave
+                {manualForm.leaveType === "full" ? "Assign Full-Day Leave" : "Assign Half-Day Leave"}
               </h3>
               <button
                 onClick={() => setIsManualModalOpen(false)}
@@ -635,21 +641,44 @@ export default function AdminLeaveDashboard() {
 
                     {/* Desktop inline dropdown (sm and above) */}
                     {dropdownOpen && (
-                      <div className="hidden sm:block absolute z-[70] top-full left-0 w-full mt-2 bg-white border border-slate-100 rounded-xl shadow-2xl ring-1 ring-black/5 max-h-56 overflow-y-auto animate-in fade-in zoom-in-95 duration-150">
-                        {employees.length === 0 ? (
-                          <div className="px-4 py-5 text-center text-sm text-slate-400">No employees found</div>
-                        ) : employees.map((emp) => (
-                          <div
-                            key={emp._id}
-                            onClick={() => { setManualForm({ ...manualForm, employeePhone: emp.phone }); setDropdownOpen(false); }}
-                            className={`flex flex-col px-4 py-3 cursor-pointer border-b border-slate-50 last:border-b-0 transition-colors hover:bg-slate-50 ${
-                              manualForm.employeePhone === emp.phone ? "bg-indigo-50/60" : ""
-                            }`}
-                          >
-                            <span className="font-bold text-slate-800 text-sm truncate">{emp.name}</span>
-                            <span className="text-[11px] text-slate-500">{emp.department || "No Dept"} • {emp.phone}</span>
+                      <div className="hidden sm:flex sm:flex-col absolute z-[70] top-full left-0 w-full mt-2 bg-white border border-slate-100 rounded-xl shadow-2xl ring-1 ring-black/5 max-h-64 animate-in fade-in zoom-in-95 duration-150">
+                        {/* Search input */}
+                        <div className="p-2 border-b border-slate-100 shrink-0">
+                          <div className="relative">
+                            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                            <input
+                              autoFocus
+                              type="text"
+                              placeholder="Search employee..."
+                              value={empSearch}
+                              onChange={(e) => setEmpSearch(e.target.value)}
+                              className="w-full pl-8 pr-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500"
+                            />
                           </div>
-                        ))}
+                        </div>
+                        {/* Employee list */}
+                        <div className="overflow-y-auto">
+                          {employees.filter((emp) =>
+                            `${emp.name} ${emp.department || ""} ${emp.phone}`.toLowerCase().includes(empSearch.toLowerCase())
+                          ).length === 0 ? (
+                            <div className="px-4 py-5 text-center text-sm text-slate-400">No employees found</div>
+                          ) : employees
+                              .filter((emp) =>
+                                `${emp.name} ${emp.department || ""} ${emp.phone}`.toLowerCase().includes(empSearch.toLowerCase())
+                              )
+                              .map((emp) => (
+                            <div
+                              key={emp._id}
+                              onClick={() => { setManualForm({ ...manualForm, employeePhone: emp.phone }); setDropdownOpen(false); setEmpSearch(""); }}
+                              className={`flex flex-col px-4 py-3 cursor-pointer border-b border-slate-50 last:border-b-0 transition-colors hover:bg-slate-50 ${
+                                manualForm.employeePhone === emp.phone ? "bg-indigo-50/60" : ""
+                              }`}
+                            >
+                              <span className="font-bold text-slate-800 text-sm truncate">{emp.name}</span>
+                              <span className="text-[11px] text-slate-500">{emp.department || "No Dept"} • {emp.phone}</span>
+                            </div>
+                          ))}
+                        </div>
                       </div>
                     )}
                   </div>
@@ -664,23 +693,44 @@ export default function AdminLeaveDashboard() {
                         className="w-full bg-white rounded-t-3xl max-h-[70vh] overflow-y-auto animate-in slide-in-from-bottom-4 duration-200"
                         onClick={(e) => e.stopPropagation()}
                       >
-                        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 sticky top-0 bg-white z-10">
-                          <h4 className="font-extrabold text-slate-900 text-base">Select Employee</h4>
-                          <button
-                            type="button"
-                            onClick={() => setDropdownOpen(false)}
-                            className="p-2 rounded-full hover:bg-slate-100 text-slate-400"
-                          >
-                            <XCircle size={20} />
-                          </button>
+                        <div className="sticky top-0 bg-white z-10 border-b border-slate-100">
+                          <div className="flex items-center justify-between px-5 py-4">
+                            <h4 className="font-extrabold text-slate-900 text-base">Select Employee</h4>
+                            <button
+                              type="button"
+                              onClick={() => { setDropdownOpen(false); setEmpSearch(""); }}
+                              className="p-2 rounded-full hover:bg-slate-100 text-slate-400"
+                            >
+                              <XCircle size={20} />
+                            </button>
+                          </div>
+                          {/* Mobile search */}
+                          <div className="px-4 pb-3">
+                            <div className="relative">
+                              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                              <input
+                                type="text"
+                                placeholder="Search employee..."
+                                value={empSearch}
+                                onChange={(e) => setEmpSearch(e.target.value)}
+                                className="w-full pl-8 pr-3 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500"
+                              />
+                            </div>
+                          </div>
                         </div>
                         <div className="divide-y divide-slate-50">
-                          {employees.length === 0 ? (
+                          {employees.filter((emp) =>
+                            `${emp.name} ${emp.department || ""} ${emp.phone}`.toLowerCase().includes(empSearch.toLowerCase())
+                          ).length === 0 ? (
                             <div className="px-5 py-10 text-center text-sm text-slate-400">No employees found</div>
-                          ) : employees.map((emp) => (
+                          ) : employees
+                              .filter((emp) =>
+                                `${emp.name} ${emp.department || ""} ${emp.phone}`.toLowerCase().includes(empSearch.toLowerCase())
+                              )
+                              .map((emp) => (
                             <div
                               key={emp._id}
-                              onClick={() => { setManualForm({ ...manualForm, employeePhone: emp.phone }); setDropdownOpen(false); }}
+                              onClick={() => { setManualForm({ ...manualForm, employeePhone: emp.phone }); setDropdownOpen(false); setEmpSearch(""); }}
                               className={`flex items-center gap-4 px-5 py-4 cursor-pointer active:bg-slate-100 transition-colors ${
                                 manualForm.employeePhone === emp.phone ? "bg-indigo-50" : ""
                               }`}
@@ -704,6 +754,37 @@ export default function AdminLeaveDashboard() {
                   )}
                 </div>
 
+                {/* Leave Type Selector */}
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wide mb-2">
+                    Leave Type *
+                  </label>
+                  <div className="grid grid-cols-2 gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setManualForm({ ...manualForm, leaveType: "half" })}
+                      className={`py-3.5 sm:py-3 rounded-xl border font-bold text-sm transition-all flex justify-center items-center gap-2 ${
+                        manualForm.leaveType === "half"
+                          ? "bg-indigo-50 border-indigo-500 text-indigo-700 ring-2 ring-indigo-500/20"
+                          : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50 hover:border-slate-300"
+                      }`}
+                    >
+                      <span className="text-lg">🕐</span> Half Day
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setManualForm({ ...manualForm, leaveType: "full" })}
+                      className={`py-3.5 sm:py-3 rounded-xl border font-bold text-sm transition-all flex justify-center items-center gap-2 ${
+                        manualForm.leaveType === "full"
+                          ? "bg-indigo-50 border-indigo-500 text-indigo-700 ring-2 ring-indigo-500/20"
+                          : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50 hover:border-slate-300"
+                      }`}
+                    >
+                      <span className="text-lg">📅</span> Full Day
+                    </button>
+                  </div>
+                </div>
+
                 <div>
                   <label className="block text-xs font-bold text-slate-700 uppercase tracking-wide mb-2">
                     Leave Date *
@@ -719,35 +800,38 @@ export default function AdminLeaveDashboard() {
                   />
                 </div>
 
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wide mb-2">
-                    Shift Slot *
-                  </label>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-                    <button
-                      type="button"
-                      onClick={() => setManualForm({ ...manualForm, shift: "Morning" })}
-                      className={`py-3.5 sm:py-3 rounded-xl border font-bold text-sm transition-all flex justify-center items-center gap-2 ${
-                        manualForm.shift === "Morning"
-                          ? "bg-indigo-50 border-indigo-500 text-indigo-700 ring-2 ring-indigo-500/20"
-                          : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50 hover:border-slate-300"
-                      }`}
-                    >
-                      <span className="text-lg">☀️</span> Morning
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setManualForm({ ...manualForm, shift: "Afternoon" })}
-                      className={`py-3.5 sm:py-3 rounded-xl border font-bold text-sm transition-all flex justify-center items-center gap-2 ${
-                        manualForm.shift === "Afternoon"
-                          ? "bg-indigo-50 border-indigo-500 text-indigo-700 ring-2 ring-indigo-500/20"
-                          : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50 hover:border-slate-300"
-                      }`}
-                    >
-                      <span className="text-lg">🌤️</span> Afternoon
-                    </button>
+                {/* Shift Slot — only shown for Half Day */}
+                {manualForm.leaveType === "half" && (
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 uppercase tracking-wide mb-2">
+                      Shift Slot *
+                    </label>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+                      <button
+                        type="button"
+                        onClick={() => setManualForm({ ...manualForm, shift: "Morning" })}
+                        className={`py-3.5 sm:py-3 rounded-xl border font-bold text-sm transition-all flex justify-center items-center gap-2 ${
+                          manualForm.shift === "Morning"
+                            ? "bg-indigo-50 border-indigo-500 text-indigo-700 ring-2 ring-indigo-500/20"
+                            : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50 hover:border-slate-300"
+                        }`}
+                      >
+                        <span className="text-lg">☀️</span> Morning
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setManualForm({ ...manualForm, shift: "Afternoon" })}
+                        className={`py-3.5 sm:py-3 rounded-xl border font-bold text-sm transition-all flex justify-center items-center gap-2 ${
+                          manualForm.shift === "Afternoon"
+                            ? "bg-indigo-50 border-indigo-500 text-indigo-700 ring-2 ring-indigo-500/20"
+                            : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50 hover:border-slate-300"
+                        }`}
+                      >
+                        <span className="text-lg">🌤️</span> Afternoon
+                      </button>
+                    </div>
                   </div>
-                </div>
+                )}
 
                 <div className="pt-2 sm:pt-0 pb-2 sm:pb-0">
                   <button
