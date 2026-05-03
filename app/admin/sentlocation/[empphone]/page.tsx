@@ -42,6 +42,24 @@ type Employee = {
   dateOfJoining: string;
 };
 
+const OFFICE_CENTER = { lat: 22.723541, lng: 75.884507 }; // Indore
+const BHOPAL_OFFICE_CENTER = { lat: 23.2349541, lng: 77.4354195 }; // Bhopal
+const OFFICE_RADIUS_METERS = 200;
+
+const haversineMeters = (loc1: {lat: number, lng: number}, loc2: {lat: number, lng: number}) => {
+  const R = 6371e3; // metres
+  const dLat = ((loc2.lat - loc1.lat) * Math.PI) / 180;
+  const dLon = ((loc2.lng - loc1.lng) * Math.PI) / 180;
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos((loc1.lat * Math.PI) / 180) *
+      Math.cos((loc2.lat * Math.PI) / 180) *
+      Math.sin(dLon / 2) *
+      Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+};
+
 const SentLocation = ({ params }: { params: { empphone: string } }) => {
   const searchParams = useSearchParams();
   const emphone = params.empphone;
@@ -92,6 +110,36 @@ const SentLocation = ({ params }: { params: { empphone: string } }) => {
     fetchSentLocations();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [date, emphone]); // Added dependencies to re-fetch if URL changes
+
+  const getFirstVisit = () => {
+    if (!locations || locations.length === 0) return null;
+    return locations.find((loc) => {
+      if (!loc.coords || typeof loc.coords.lat !== 'number' || typeof loc.coords.lng !== 'number') return false;
+      if (loc.coords.lat === 0 && loc.coords.lng === 0) return false;
+      
+      const dIndore = haversineMeters(loc.coords, OFFICE_CENTER);
+      const dBhopal = haversineMeters(loc.coords, BHOPAL_OFFICE_CENTER);
+      
+      // Outside office radius
+      return dIndore > OFFICE_RADIUS_METERS && dBhopal > OFFICE_RADIUS_METERS;
+    });
+  };
+
+  const getLastVisit = () => {
+    if (!locations || locations.length === 0) return null;
+    for (let i = locations.length - 1; i >= 0; i--) {
+      const loc = locations[i];
+      if (!loc.coords) continue;
+      // Skip the 0,0 location which is default for auto checkout
+      if (loc.coords.lat === 0 && loc.coords.lng === 0) continue;
+      
+      return loc;
+    }
+    return null;
+  };
+
+  const firstVisit = getFirstVisit();
+  const lastVisit = getLastVisit();
 
   if (loading) {
     return (
@@ -170,6 +218,40 @@ const SentLocation = ({ params }: { params: { empphone: string } }) => {
                   {totalDistanceTavel.toFixed(2)}Km
                 </span>
               </p>
+              {firstVisit && (
+                <p className="mt-2 text-slate-500 flex items-center gap-2">
+                  <MapPin className="h-4 w-4 text-green-500" />
+                  First Visit: {" "}
+                  <a
+                    href={`https://www.google.com/maps?q=${firstVisit.coords.lat},${firstVisit.coords.lng}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="font-medium text-blue-600 hover:underline"
+                  >
+                    {firstVisit.coords.lat.toFixed(6)}, {firstVisit.coords.lng.toFixed(6)}
+                  </a>
+                  <span className="text-xs ml-2">
+                    ({new Date(firstVisit.date).toLocaleTimeString("en-IN", { timeZone: "Asia/Kolkata", hour: "2-digit", minute: "2-digit" })})
+                  </span>
+                </p>
+              )}
+              {lastVisit && (
+                <p className="mt-2 text-slate-500 flex items-center gap-2">
+                  <MapPin className="h-4 w-4 text-red-500" />
+                  Last Visit: {" "}
+                  <a
+                    href={`https://www.google.com/maps?q=${lastVisit.coords.lat},${lastVisit.coords.lng}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="font-medium text-blue-600 hover:underline"
+                  >
+                    {lastVisit.coords.lat.toFixed(6)}, {lastVisit.coords.lng.toFixed(6)}
+                  </a>
+                  <span className="text-xs ml-2">
+                    ({new Date(lastVisit.date).toLocaleTimeString("en-IN", { timeZone: "Asia/Kolkata", hour: "2-digit", minute: "2-digit" })})
+                  </span>
+                </p>
+              )}
             </div>
             <div className="flex items-center gap-2 rounded-full bg-white px-4 py-2 shadow-sm ring-1 ring-slate-200">
               <div className="flex h-2 w-2 relative">

@@ -76,7 +76,30 @@ export async function GET(req: NextRequest) {
       date: { $gte: start, $lte: end },
     }).lean() as any;
 
-    const allLocations: any[] = [...locations];
+    // Build a set of timestamps to deduplicate against (check-in / check-out)
+    const DEDUP_WINDOW_MS = 2 * 60 * 1000; // 2 minutes
+    const dedupeTimestamps: number[] = [];
+
+    if (attendance) {
+      if (attendance.checkInTime) {
+        dedupeTimestamps.push(new Date(attendance.checkInTime).getTime());
+      }
+      if (attendance.checkOutTime) {
+        dedupeTimestamps.push(new Date(attendance.checkOutTime).getTime());
+      }
+    }
+
+    // Filter out SentLocation breadcrumbs that fall within the dedup window
+    // of a check-in or check-out timestamp (these are duplicates created by
+    // handleSendLocation auto-checking-in then immediately sending a location).
+    const filteredLocations = (locations as any[]).filter((loc) => {
+      const locTime = new Date(loc.date).getTime();
+      return !dedupeTimestamps.some(
+        (ts) => Math.abs(locTime - ts) <= DEDUP_WINDOW_MS
+      );
+    });
+
+    const allLocations: any[] = [...filteredLocations];
 
     if (attendance) {
       if (attendance.checkInTime && attendance.checkInLocation) {

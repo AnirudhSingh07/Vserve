@@ -100,6 +100,93 @@ const LocationCountCell = ({ phone, date }: { phone: string; date: string }) => 
   );
 };
 
+// Office location constants (must match dashboard/page.tsx)
+const OFFICE_CENTER = { lat: 22.723541, lng: 75.884507 };
+const BHOPAL_OFFICE_CENTER = { lat: 23.2349541, lng: 77.4354195 };
+const OFFICE_RADIUS_METERS = 200;
+
+const haversineMeters = (c1: { lat: number; lng: number }, c2: { lat: number; lng: number }) => {
+  const R = 6371000;
+  const dLat = ((c2.lat - c1.lat) * Math.PI) / 180;
+  const dLng = ((c2.lng - c1.lng) * Math.PI) / 180;
+  const lat1 = (c1.lat * Math.PI) / 180;
+  const lat2 = (c2.lat * Math.PI) / 180;
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.sin(dLng / 2) ** 2 * Math.cos(lat1) * Math.cos(lat2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+};
+
+const WorkModeCell = ({ phone, date }: { phone: string; date: string }) => {
+  const [mode, setMode] = useState<"office" | "field" | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  const formattedDate = date.split("T")[0].split(" ")[0];
+
+  useEffect(() => {
+    let isMounted = true;
+    const fetchFirstVisit = async () => {
+      try {
+        const res = await fetch(
+          `/api/attendance/sentloc?phone=${phone}&date=${formattedDate}`
+        );
+        if (res.ok) {
+          const result = await res.json();
+          if (result.success && result.data && result.data.length > 0) {
+            // Find the first valid location (including check-in, excluding check-out and 0,0)
+            const firstVisit = result.data.find((loc: any) => {
+              if (!loc.coords || typeof loc.coords.lat !== "number") return false;
+              if (loc.coords.lat === 0 && loc.coords.lng === 0) return false;
+              if (loc.isCheckOut) return false;
+              return true;
+            });
+
+            if (firstVisit && isMounted) {
+              const dIndore = haversineMeters(firstVisit.coords, OFFICE_CENTER);
+              const dBhopal = haversineMeters(firstVisit.coords, BHOPAL_OFFICE_CENTER);
+              const insideOffice =
+                dIndore <= OFFICE_RADIUS_METERS || dBhopal <= OFFICE_RADIUS_METERS;
+              setMode(insideOffice ? "office" : "field");
+            } else if (isMounted) {
+              setMode(null);
+            }
+          } else {
+            if (isMounted) setMode(null);
+          }
+        } else {
+          if (isMounted) setMode(null);
+        }
+      } catch {
+        if (isMounted) setMode(null);
+      } finally {
+        if (isMounted) setLoading(false);
+      }
+    };
+
+    fetchFirstVisit();
+    return () => { isMounted = false; };
+  }, [phone, formattedDate]);
+
+  if (loading) {
+    return <Loader2 className="w-4 h-4 animate-spin text-slate-300" />;
+  }
+
+  if (mode === null) {
+    return <span className="text-gray-400">--</span>;
+  }
+
+  return mode === "field" ? (
+    <span className="inline-flex items-center gap-1 rounded-full bg-green-50 px-2.5 py-1 text-xs font-semibold text-green-700 ring-1 ring-inset ring-green-600/20">
+      <MapPin className="w-3 h-3" /> Field
+    </span>
+  ) : (
+    <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700 ring-1 ring-inset ring-blue-600/20">
+      <Building className="w-3 h-3" /> Office
+    </span>
+  );
+};
+
 type DateFilterType = "today" | "yesterday" | "date" | "range" | "all";
 
 export default function AttendanceLogs({
@@ -681,6 +768,9 @@ export default function AttendanceLogs({
                   Check-in
                 </th>
                 <th className="px-3 sm:px-4 py-2 text-left text-xs sm:text-sm font-medium text-gray-500 uppercase">
+                  <MapPin className="inline w-4 h-4 mr-1" /> Work Mode
+                </th>
+                <th className="px-3 sm:px-4 py-2 text-left text-xs sm:text-sm font-medium text-gray-500 uppercase">
                   Check-Out
                 </th>
                 <th className="px-3 sm:px-4 py-2 text-left text-xs sm:text-sm font-medium text-gray-500 uppercase">
@@ -746,6 +836,13 @@ export default function AttendanceLogs({
                   {/* ✅ Applied 12-hour formatting here */}
                   <td className="px-3 sm:px-4 py-2 text-gray-700">
                     {formatTo12Hour(row.checkIn)}
+                  </td>
+                  <td className="px-3 sm:px-4 py-2">
+                    {row.checkIn ? (
+                      <WorkModeCell phone={row.phone} date={row.date} />
+                    ) : (
+                      <span className="text-gray-400">--</span>
+                    )}
                   </td>
                   <td className="px-3 sm:px-4 py-2 text-gray-700">
                     {formatTo12Hour(row.checkOut)}

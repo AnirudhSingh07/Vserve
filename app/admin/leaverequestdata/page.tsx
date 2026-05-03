@@ -11,6 +11,8 @@ import {
   CalendarDays,
   User,
   Search,
+  MapPin,
+  Building2,
 } from "lucide-react";
 import dayjs from "dayjs";
 import utc from "dayjs/plugin/utc";
@@ -29,7 +31,13 @@ const IST_TIMEZONE = "Asia/Kolkata";
 // Type definition for better code safety
 interface LeaveRequest {
   _id: string;
-  employeeId: string;
+  employeeId: {
+    _id: string;
+    department?: string;
+    location?: string;
+    role?: string;
+    phone?: string;
+  } | string;
   employeeName: string;
   leaveFrom: string;
   leaveTo: string;
@@ -51,6 +59,14 @@ export default function AdminLeaveDashboard() {
     "all" | "today" | "pending" | "approved"
   >("all");
   const [searchQuery, setSearchQuery] = useState("");
+
+  // Helper to extract populated employeeId fields
+  const getEmpField = (req: LeaveRequest) => {
+    if (typeof req.employeeId === "object" && req.employeeId !== null) {
+      return req.employeeId;
+    }
+    return {} as { department?: string; location?: string; role?: string; phone?: string };
+  };
 
   // Modal State
   const [confirmModal, setConfirmModal] = useState<{
@@ -384,6 +400,24 @@ export default function AdminLeaveDashboard() {
                                 req.leaveFrom !== req.leaveTo &&
                                 ` - ${dayjs(req.leaveTo).tz(IST_TIMEZONE).format("DD MMM")}`}
                             </span>
+                            {getEmpField(req).department && (
+                              <>
+                                <span className="text-slate-300">&bull;</span>
+                                <span className="flex items-center gap-1 text-violet-600 font-medium">
+                                  <Building2 size={11} />
+                                  {getEmpField(req).department}
+                                </span>
+                              </>
+                            )}
+                            {getEmpField(req).location && (
+                              <>
+                                <span className="text-slate-300">&bull;</span>
+                                <span className="flex items-center gap-1 text-sky-600 font-medium">
+                                  <MapPin size={11} />
+                                  {getEmpField(req).location}
+                                </span>
+                              </>
+                            )}
                           </div>
                         </div>
                       </div>
@@ -428,6 +462,36 @@ export default function AdminLeaveDashboard() {
                               <p className="text-sm text-slate-600 leading-relaxed italic bg-white p-3 rounded-lg border border-slate-200/60 shadow-sm">
                                 "{req.message}"
                               </p>
+                            </div>
+
+                            {/* Employee Location & Department */}
+                            <div className="flex flex-wrap gap-3">
+                              {getEmpField(req).department && (
+                                <div className="flex items-center gap-2 bg-violet-50 border border-violet-100 rounded-lg px-3 py-2">
+                                  <Building2 size={14} className="text-violet-500 shrink-0" />
+                                  <div>
+                                    <p className="text-[10px] font-bold text-violet-400 uppercase tracking-widest leading-none">
+                                      Department
+                                    </p>
+                                    <p className="text-sm font-semibold text-violet-800 mt-0.5">
+                                      {getEmpField(req).department}
+                                    </p>
+                                  </div>
+                                </div>
+                              )}
+                              {getEmpField(req).location && (
+                                <div className="flex items-center gap-2 bg-sky-50 border border-sky-100 rounded-lg px-3 py-2">
+                                  <MapPin size={14} className="text-sky-500 shrink-0" />
+                                  <div>
+                                    <p className="text-[10px] font-bold text-sky-400 uppercase tracking-widest leading-none">
+                                      Location
+                                    </p>
+                                    <p className="text-sm font-semibold text-sky-800 mt-0.5">
+                                      {getEmpField(req).location}
+                                    </p>
+                                  </div>
+                                </div>
+                              )}
                             </div>
                           </div>
 
@@ -476,7 +540,7 @@ export default function AdminLeaveDashboard() {
                               onClick={() =>
                                 setConfirmModal({
                                   id: req._id,
-                                  empId: req.employeeId,
+                                  empId: typeof req.employeeId === "object" ? req.employeeId._id : req.employeeId,
                                   type: "reject",
                                   employeeName: req.employeeName,
                                 })
@@ -489,7 +553,7 @@ export default function AdminLeaveDashboard() {
                               onClick={() =>
                                 setConfirmModal({
                                   id: req._id,
-                                  empId: req.employeeId,
+                                  empId: typeof req.employeeId === "object" ? req.employeeId._id : req.employeeId,
                                   type: "accept",
                                   employeeName: req.employeeName,
                                 })

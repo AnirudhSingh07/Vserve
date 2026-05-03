@@ -74,7 +74,7 @@ export async function GET(req: Request) {
     await connectDB();
     const allRequests = await LeaveRequest.find({})
       .sort({ createdAt: -1 })
-      .populate("employeeId", "department role phone");
+      .populate("employeeId", "department role phone location");
 
     return NextResponse.json(
       { count: allRequests.length, data: allRequests },

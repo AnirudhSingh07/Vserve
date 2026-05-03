@@ -11,6 +11,9 @@ import {
   Clock,
   CheckCircle,
   XCircle,
+  MapPin,
+  Building2,
+  User,
 } from "lucide-react";
 
 export type LateReq = {
@@ -21,6 +24,9 @@ export type LateReq = {
   status: "pending" | "approved" | "rejected";
   remarks?: string;
   createdAt?: number;
+  location?: string;
+  department?: string;
+  employeeName?: string;
 };
 
 export default function LateRequestRow({
@@ -34,14 +40,39 @@ export default function LateRequestRow({
   return (
     <div className="bg-white border border-gray-200 rounded-xl p-5 hover:shadow-md transition-shadow">
       <div className="grid md:grid-cols-12 gap-4 items-start">
-        <div className="md:col-span-2">
-          <div className="flex items-center gap-2 mb-1">
-            <Phone className="w-4 h-4 text-gray-400" />
-            <div className="text-xs font-semibold text-gray-500 uppercase">
-              Phone
+        <div className="md:col-span-2 space-y-3">
+          <div>
+            <div className="flex items-center gap-2 mb-1">
+              <Phone className="w-4 h-4 text-gray-400" />
+              <div className="text-xs font-semibold text-gray-500 uppercase">
+                Phone
+              </div>
             </div>
+            <div className="text-sm font-medium text-gray-900">{req.phone}</div>
           </div>
-          <div className="text-sm font-medium text-gray-900">{req.phone}</div>
+          
+          {(req.department || req.location || req.employeeName) && (
+            <div className="space-y-1.5">
+              {req.employeeName && (
+                <div className="flex items-center gap-1.5 text-xs text-gray-700">
+                  <User className="w-3.5 h-3.5 text-gray-400" />
+                  <span className="truncate">{req.employeeName}</span>
+                </div>
+              )}
+              {req.department && (
+                <div className="flex items-center gap-1.5 text-xs text-violet-700">
+                  <Building2 className="w-3.5 h-3.5" />
+                  <span className="truncate font-medium">{req.department}</span>
+                </div>
+              )}
+              {req.location && (
+                <div className="flex items-center gap-1.5 text-xs text-sky-700">
+                  <MapPin className="w-3.5 h-3.5" />
+                  <span className="truncate font-medium">{req.location}</span>
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         <div className="md:col-span-2">
