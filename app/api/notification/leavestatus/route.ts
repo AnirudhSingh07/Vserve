@@ -7,9 +7,9 @@ import mongoose from "mongoose";
 export async function POST(req: Request) {
   try {
     await connectDB();
-    const { requestId, employeeId, action } = await req.json();
+    const { requestId, employeeId, action, remark } = await req.json();
 
-    console.log("leavestatus POST received:", { requestId, employeeId, action });
+    console.log("leavestatus POST received:", { requestId, employeeId, action, remark });
 
     if (!requestId || !action) {
       return NextResponse.json({ error: "Missing data" }, { status: 400 });
@@ -22,11 +22,20 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Invalid Request ID format" }, { status: 400 });
     }
 
+    // Build the update object — always include status, optionally include adminRemark
+    const buildUpdate = (status: string) => {
+      const update: Record<string, string> = { status };
+      if (remark && remark.trim()) {
+        update.adminRemark = remark.trim();
+      }
+      return update;
+    };
+
     if (action === "accept") {
-      // 1. Update the status to 'Approved'
+      // 1. Update the status to 'Approved' (with optional remark)
       const updatedRequest = await LeaveRequest.findByIdAndUpdate(
         objectId,
-        { status: "Approved" },
+        buildUpdate("Approved"),
         { new: true, runValidators: false }
       );
 
@@ -44,10 +53,10 @@ export async function POST(req: Request) {
         data: updatedRequest,
       });
     } else if (action === "reject") {
-      // 2. Update status to 'Rejected' instead of deleting
+      // 2. Update status to 'Rejected' (with optional remark)
       const rejectedRequest = await LeaveRequest.findByIdAndUpdate(
         objectId,
-        { status: "Rejected" },
+        buildUpdate("Rejected"),
         { new: true, runValidators: false }
       );
 

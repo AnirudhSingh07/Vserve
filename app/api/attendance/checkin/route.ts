@@ -34,7 +34,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(
         {
           success: false,
-          error: "Check-in allowed only between 8:00 AM and 7:00 PM.",
+          error: "Check-in allowed only between 8:00 AM and 7:30 PM.",
         },
         { status: 403 }
       );

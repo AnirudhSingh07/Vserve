@@ -43,6 +43,11 @@ const LeaveRequestSchema = new Schema(
       enum: ["Pending", "Approved", "Rejected"],
       default: "Pending",
     },
+    // Optional remark from admin explaining the approve/reject decision
+    adminRemark: {
+      type: String,
+      default: "",
+    },
   },
   {
     timestamps: true, // This automatically manages 'createdAt' and 'updatedAt'

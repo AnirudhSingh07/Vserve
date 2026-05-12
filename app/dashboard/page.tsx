@@ -65,7 +65,7 @@ export default function DashboardPage() {
   const [showCheckoutModal, setShowCheckoutModal] = useState(false);
 
   const WORK_START_HOUR = 8; // 8:00 AM
-  const WORK_END_HOUR = 19.30  ; // 7:30 PM
+  const WORK_END_HOUR = 19.30; // 7:30 PM
 
   const mapRef = useRef<google.maps.Map | null>(null);
 
@@ -560,7 +560,7 @@ export default function DashboardPage() {
                     disabled
                     className="px-6 py-3 text-gray-700 rounded-full text-sm cursor-not-allowed"
                   >
-                    Attendance Closed (9:00 AM – 8:00 PM)
+                    Attendance Closed (8:00 AM – 7:30 PM)
                   </button>
                 );
               }
@@ -712,7 +712,7 @@ export default function DashboardPage() {
               return (
                 <p className="text-red-500">
                   Attendance available only between{" "}
-                  <strong>9:00 AM and 8:00 PM</strong>.
+                  <strong>8:00 AM and 7:30 PM</strong>.
                 </p>
               );
             }

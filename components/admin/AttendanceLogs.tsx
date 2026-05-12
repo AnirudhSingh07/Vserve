@@ -17,6 +17,7 @@ import {
   MapPin,
   Building,
   User,
+  Navigation,
 } from "lucide-react";
 
 type AttendanceRow = {
@@ -184,6 +185,116 @@ const WorkModeCell = ({ phone, date }: { phone: string; date: string }) => {
     <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700 ring-1 ring-inset ring-blue-600/20">
       <Building className="w-3 h-3" /> Office
     </span>
+  );
+};
+
+// ── First Visit / Last Visit Cell ──────────────────────────────────────────
+// Reuses the same sentloc API and office-radius logic from the sentlocation page.
+const FirstLastVisitCell = ({ phone, date }: { phone: string; date: string }) => {
+  const [firstVisit, setFirstVisit] = useState<{ lat: number; lng: number; time: string } | null>(null);
+  const [lastVisit, setLastVisit] = useState<{ lat: number; lng: number; time: string } | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  const formattedDate = date.split("T")[0].split(" ")[0];
+
+  useEffect(() => {
+    let isMounted = true;
+    const fetchVisits = async () => {
+      try {
+        const res = await fetch(
+          `/api/attendance/sentloc?phone=${phone}&date=${formattedDate}`
+        );
+        if (!res.ok) { if (isMounted) setLoading(false); return; }
+
+        const result = await res.json();
+        if (!result.success || !result.data || result.data.length === 0) {
+          if (isMounted) setLoading(false);
+          return;
+        }
+
+        const locs: any[] = result.data;
+
+        // First Visit: first location OUTSIDE office radius (same as sentlocation page)
+        const first = locs.find((loc: any) => {
+          if (!loc.coords || typeof loc.coords.lat !== "number") return false;
+          if (loc.coords.lat === 0 && loc.coords.lng === 0) return false;
+          const dIndore = haversineMeters(loc.coords, OFFICE_CENTER);
+          const dBhopal = haversineMeters(loc.coords, BHOPAL_OFFICE_CENTER);
+          return dIndore > OFFICE_RADIUS_METERS && dBhopal > OFFICE_RADIUS_METERS;
+        });
+
+        // Last Visit: last valid non-0,0 location (same as sentlocation page)
+        let last = null;
+        for (let i = locs.length - 1; i >= 0; i--) {
+          const loc = locs[i];
+          if (!loc.coords) continue;
+          if (loc.coords.lat === 0 && loc.coords.lng === 0) continue;
+          last = loc;
+          break;
+        }
+
+        if (isMounted) {
+          if (first) {
+            setFirstVisit({
+              lat: first.coords.lat,
+              lng: first.coords.lng,
+              time: new Date(first.date).toLocaleTimeString("en-IN", {
+                timeZone: "Asia/Kolkata", hour: "2-digit", minute: "2-digit",
+              }),
+            });
+          }
+          if (last) {
+            setLastVisit({
+              lat: last.coords.lat,
+              lng: last.coords.lng,
+              time: new Date(last.date).toLocaleTimeString("en-IN", {
+                timeZone: "Asia/Kolkata", hour: "2-digit", minute: "2-digit",
+              }),
+            });
+          }
+        }
+      } catch {
+        // silently fail
+      } finally {
+        if (isMounted) setLoading(false);
+      }
+    };
+
+    fetchVisits();
+    return () => { isMounted = false; };
+  }, [phone, formattedDate]);
+
+  if (loading) {
+    return (
+      <>
+        <td className="px-3 sm:px-4 py-2"><Loader2 className="w-4 h-4 animate-spin text-slate-300" /></td>
+        <td className="px-3 sm:px-4 py-2"><Loader2 className="w-4 h-4 animate-spin text-slate-300" /></td>
+      </>
+    );
+  }
+
+  const renderVisit = (visit: { lat: number; lng: number; time: string } | null, color: string) => {
+    if (!visit) return <span className="text-gray-400">--</span>;
+    return (
+      <a
+        href={`https://www.google.com/maps?q=${visit.lat},${visit.lng}`}
+        target="_blank"
+        rel="noopener noreferrer"
+        onClick={(e) => e.stopPropagation()}
+        className={`inline-flex items-center gap-1 text-xs font-medium ${color} hover:underline`}
+        title={`${visit.lat.toFixed(6)}, ${visit.lng.toFixed(6)}`}
+      >
+        <Navigation className="w-3 h-3" />
+        {visit.time}
+      </a>
+    );
+  };
+
+  return (
+    <>
+      <td className="px-3 sm:px-4 py-2">{renderVisit(firstVisit, "text-green-600")}</td>
+      <td className="px-3 sm:px-4 py-2">{renderVisit(lastVisit, "text-red-600")}</td>
+    </>
   );
 };
 
@@ -780,6 +891,12 @@ export default function AttendanceLogs({
                   Department
                 </th>
                 <th className="px-3 sm:px-4 py-2 text-left text-xs sm:text-sm font-medium text-gray-500 uppercase">
+                  <MapPin className="inline w-4 h-4 mr-1 text-green-500" /> First Visit
+                </th>
+                <th className="px-3 sm:px-4 py-2 text-left text-xs sm:text-sm font-medium text-gray-500 uppercase">
+                  <MapPin className="inline w-4 h-4 mr-1 text-red-500" /> Last Visit
+                </th>
+                <th className="px-3 sm:px-4 py-2 text-left text-xs sm:text-sm font-medium text-gray-500 uppercase">
                   Km
                 </th>
                 <th className="px-3 sm:px-4 py-2 text-left text-xs sm:text-sm font-medium text-gray-500 uppercase">
@@ -814,8 +931,8 @@ export default function AttendanceLogs({
                         .split(":")
                         .map(Number);
                       const checkInMinutes = hours * 60 + minutes;
-                      const nineAM = 9 * 60;
-                      const tenAM = 10 * 60;
+                      const nineAM = 8 * 60;
+                      const tenAM = 9 * 60;
                       let status =
                         checkInMinutes < nineAM || checkInMinutes > tenAM
                           ? "Late"
@@ -853,6 +970,15 @@ export default function AttendanceLogs({
                   <td className="px-3 sm:px-4 py-2 text-gray-700">
                     {row.department || "—"}
                   </td>
+                  {/* First Visit & Last Visit Columns */}
+                  {row.checkIn ? (
+                    <FirstLastVisitCell phone={row.phone} date={row.date} />
+                  ) : (
+                    <>
+                      <td className="px-3 sm:px-4 py-2"><span className="text-gray-400">--</span></td>
+                      <td className="px-3 sm:px-4 py-2"><span className="text-gray-400">--</span></td>
+                    </>
+                  )}
                   <td className="px-3 sm:px-4 py-2">
                     {(() => {
                       const km = dailyDistanceMap[buildDistanceKey(row.phone, row.date)];

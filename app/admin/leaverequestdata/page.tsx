@@ -13,6 +13,7 @@ import {
   Search,
   MapPin,
   Building2,
+  MessageSquare,
 } from "lucide-react";
 import dayjs from "dayjs";
 import utc from "dayjs/plugin/utc";
@@ -46,6 +47,7 @@ interface LeaveRequest {
   subject: string;
   message: string;
   status: "Pending" | "Approved" | "Rejected";
+  adminRemark?: string;
   createdAt: string;
 }
 
@@ -75,6 +77,7 @@ export default function AdminLeaveDashboard() {
     type: "accept" | "reject";
     employeeName: string; // Added for better modal UX
   } | null>(null);
+  const [remarkText, setRemarkText] = useState("");
   const [actionLoading, setActionLoading] = useState(false);
 
   // Manual Leave State
@@ -235,11 +238,13 @@ export default function AdminLeaveDashboard() {
           requestId: confirmModal.id,
           employeeId: confirmModal.empId,
           action: confirmModal.type,
+          remark: remarkText.trim() || undefined,
         }),
       });
 
       if (res.ok) {
         // OPTIMISTIC UPDATE: Update local state immediately instead of refetching
+        const savedRemark = remarkText.trim();
         setAllRequests((prev) =>
           prev.map((req) =>
             req._id === confirmModal.id
@@ -247,11 +252,13 @@ export default function AdminLeaveDashboard() {
                   ...req,
                   status:
                     confirmModal.type === "accept" ? "Approved" : "Rejected",
+                  adminRemark: savedRemark || req.adminRemark,
                 }
               : req,
           ),
         );
         setConfirmModal(null);
+        setRemarkText("");
         // Close the expanded view automatically after action
         setExpandedId(null);
       } else {
@@ -537,47 +544,71 @@ export default function AdminLeaveDashboard() {
                         {isPending ? (
                           <div className="flex gap-3 pt-2 border-t border-slate-200/50">
                             <button
-                              onClick={() =>
+                              onClick={() => {
+                                setRemarkText("");
                                 setConfirmModal({
                                   id: req._id,
                                   empId: typeof req.employeeId === "object" ? req.employeeId._id : req.employeeId,
                                   type: "reject",
                                   employeeName: req.employeeName,
-                                })
-                              }
+                                });
+                              }}
                               className="flex-1 py-2.5 bg-white border border-slate-200 text-slate-600 hover:bg-rose-50 hover:text-rose-600 hover:border-rose-200 rounded-xl text-sm font-bold transition-all"
                             >
                               Reject Request
                             </button>
                             <button
-                              onClick={() =>
+                              onClick={() => {
+                                setRemarkText("");
                                 setConfirmModal({
                                   id: req._id,
                                   empId: typeof req.employeeId === "object" ? req.employeeId._id : req.employeeId,
                                   type: "accept",
                                   employeeName: req.employeeName,
-                                })
-                              }
+                                });
+                              }}
                               className="flex-1 py-2.5 bg-slate-900 text-white hover:bg-emerald-600 rounded-xl text-sm font-bold shadow-lg shadow-slate-200 transition-all transform active:scale-[0.98]"
                             >
                               Approve Request
                             </button>
                           </div>
                         ) : (
-                          <div className="flex items-center gap-2 text-sm text-slate-400 italic pt-2 border-t border-slate-200/50">
-                            {req.status === "Approved" ? (
-                              <CheckCircle2
-                                size={16}
-                                className="text-emerald-500"
-                              />
-                            ) : (
-                              <XCircle size={16} className="text-rose-500" />
+                          <div className="space-y-2 pt-2 border-t border-slate-200/50">
+                            <div className="flex items-center gap-2 text-sm text-slate-400 italic">
+                              {req.status === "Approved" ? (
+                                <CheckCircle2
+                                  size={16}
+                                  className="text-emerald-500"
+                                />
+                              ) : (
+                                <XCircle size={16} className="text-rose-500" />
+                              )}
+                              Request already processed as{" "}
+                              <span className="font-bold lowercase">
+                                {req.status}
+                              </span>
+                              .
+                            </div>
+                            {/* Show Admin Remark if present */}
+                            {req.adminRemark && req.adminRemark.trim() && (
+                              <div className={`flex items-start gap-2 p-3 rounded-lg border ${
+                                req.status === "Approved"
+                                  ? "bg-emerald-50/60 border-emerald-100"
+                                  : "bg-rose-50/60 border-rose-100"
+                              }`}>
+                                <MessageSquare size={14} className={`mt-0.5 shrink-0 ${
+                                  req.status === "Approved" ? "text-emerald-500" : "text-rose-500"
+                                }`} />
+                                <div>
+                                  <p className={`text-[10px] font-bold uppercase tracking-widest mb-0.5 ${
+                                    req.status === "Approved" ? "text-emerald-500" : "text-rose-500"
+                                  }`}>Admin Remark</p>
+                                  <p className="text-sm text-slate-700 leading-relaxed">
+                                    {req.adminRemark}
+                                  </p>
+                                </div>
+                              </div>
                             )}
-                            Request already processed as{" "}
-                            <span className="font-bold lowercase">
-                              {req.status}
-                            </span>
-                            .
                           </div>
                         )}
                       </div>
@@ -627,6 +658,23 @@ export default function AdminLeaveDashboard() {
               </span>
               ?
             </p>
+
+            {/* Optional Remark Textarea */}
+            <div className="mb-6">
+              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">
+                Admin Remark <span className="text-slate-400 font-normal normal-case tracking-normal">(optional)</span>
+              </label>
+              <textarea
+                rows={3}
+                placeholder={confirmModal.type === "accept" ? "e.g. Approved, enjoy your time off!" : "e.g. Insufficient leave balance / Team needs you that day"}
+                value={remarkText}
+                onChange={(e) => setRemarkText(e.target.value)}
+                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-700 outline-none focus:ring-2 focus:ring-indigo-500 resize-none placeholder:text-slate-300 transition-shadow"
+              />
+              <p className="text-[11px] text-slate-400 mt-1.5">
+                This remark will be visible to the employee.
+              </p>
+            </div>
 
             <div className="flex gap-3">
               <button

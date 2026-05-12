@@ -466,6 +466,43 @@ export default function LeaveRequestPage() {
                             </p>
                           </div>
                         </div>
+
+                        {/* Admin Remark — shown to employee if admin provided one */}
+                        {notif.adminRemark && notif.adminRemark.trim() && (
+                          <div className={`mt-4 p-3 rounded-xl border flex items-start gap-2.5 ${
+                            notif.status === "Approved"
+                              ? "bg-green-50 border-green-100"
+                              : notif.status === "Rejected"
+                                ? "bg-red-50 border-red-100"
+                                : "bg-gray-50 border-gray-100"
+                          }`}>
+                            <svg
+                              className={`w-4 h-4 mt-0.5 shrink-0 ${
+                                notif.status === "Approved"
+                                  ? "text-green-500"
+                                  : notif.status === "Rejected"
+                                    ? "text-red-500"
+                                    : "text-gray-400"
+                              }`}
+                              fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                            >
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"
+                                d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" />
+                            </svg>
+                            <div>
+                              <p className={`text-[10px] font-bold uppercase tracking-widest mb-0.5 ${
+                                notif.status === "Approved"
+                                  ? "text-green-600"
+                                  : notif.status === "Rejected"
+                                    ? "text-red-600"
+                                    : "text-gray-500"
+                              }`}>Admin Remark</p>
+                              <p className="text-sm text-gray-700 leading-relaxed">
+                                {notif.adminRemark}
+                              </p>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     );
                   })
