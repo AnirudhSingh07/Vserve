@@ -310,6 +310,30 @@ import {
   Search,
 } from "lucide-react";
 
+const DEPARTMENTS = [
+  "Sales",
+  "IT",
+  "Marketing",
+  "HR",
+  "Operations",
+  "Finance",
+  "Design",
+  "Support",
+  "Manager",
+  "Team Leader",
+  "Telecaller",
+  "Field Executive",
+  "Backend Executive",
+];
+
+const LOCATIONS = [
+  "Indore",
+  "Bhopal",
+  "Sehore",
+  "Pithampur",
+  "Hoshangabad"
+];
+
 type UserType = {
   _id: string;
   idCard?: string;
@@ -341,6 +365,11 @@ export default function EmployeeDirectory({ users }: { users: UserType[] }) {
   // 🔹 NEW: search state
   const [searchTerm, setSearchTerm] = useState("");
 
+  const [selectedLocation, setSelectedLocation] = useState("");
+  const [otherLocation, setOtherLocation] = useState("");
+  const [selectedDepartment, setSelectedDepartment] = useState("");
+  const [otherDepartment, setOtherDepartment] = useState("");
+
   // 🔹 NEW: Edit modal state
   const [editTargetId, setEditTargetId] = useState<string | null>(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -367,7 +396,16 @@ export default function EmployeeDirectory({ users }: { users: UserType[] }) {
   }, [users]);
 
   const toggleEmployeeExpand = (id: string) => {
-    setExpandedEmployeeId((prev) => (prev === id ? null : id));
+    setExpandedEmployeeId((prev) => {
+      if (prev !== id) {
+        setSelectedLocation("");
+        setOtherLocation("");
+        setSelectedDepartment("");
+        setOtherDepartment("");
+        return id;
+      }
+      return null;
+    });
   };
   const router = useRouter();
 
@@ -439,6 +477,15 @@ export default function EmployeeDirectory({ users }: { users: UserType[] }) {
       formattedDate = date.toISOString().split("T")[0];
     }
 
+    const initialDept = employee.department || "";
+    const isDeptOther = initialDept && !DEPARTMENTS.includes(initialDept);
+    
+    const initialLoc = employee.location || "";
+    const isLocOther = initialLoc && !LOCATIONS.includes(initialLoc);
+
+    setOtherDepartment(isDeptOther ? initialDept : "");
+    setOtherLocation(isLocOther ? initialLoc : "");
+
     setEditFormData({
       name: employee.name || "",
       fatherName: employee.fatherName || "",
@@ -448,8 +495,8 @@ export default function EmployeeDirectory({ users }: { users: UserType[] }) {
       bankAccountNumber: employee.bankAccountNumber || "",
       dateOfJoining: formattedDate,
       addressProof: employee.addressProof || "",
-      department: employee.department || "",
-      location: employee.location || "",
+      department: isDeptOther ? "Other" : initialDept,
+      location: isLocOther ? "Other" : initialLoc,
       idCardNumber: employee.idCardNumber || "",
       password: "", // Leave empty by default
     });
@@ -499,6 +546,9 @@ export default function EmployeeDirectory({ users }: { users: UserType[] }) {
 
     try {
       // Prepare update payload
+      const finalDepartment = editFormData.department === "Other" ? otherDepartment : editFormData.department;
+      const finalLocation = editFormData.location === "Other" ? otherLocation : editFormData.location;
+
       const updatePayload: any = {
         employeeId: editTargetId,
         name: editFormData.name,
@@ -509,8 +559,8 @@ export default function EmployeeDirectory({ users }: { users: UserType[] }) {
         bankAccountNumber: editFormData.bankAccountNumber,
         dateOfJoining: editFormData.dateOfJoining,
         addressProof: editFormData.addressProof,
-        department: editFormData.department,
-        location: editFormData.location,
+        department: finalDepartment,
+        location: finalLocation,
         idCardNumber: editFormData.idCardNumber,
       };
 
@@ -538,19 +588,19 @@ export default function EmployeeDirectory({ users }: { users: UserType[] }) {
         prev.map((emp) =>
           emp._id === editTargetId
             ? {
-                ...emp,
-                name: editFormData.name,
-                fatherName: editFormData.fatherName,
-                phone: editFormData.phone,
-                role: editFormData.role,
-                panCard: editFormData.panCard,
-                bankAccountNumber: editFormData.bankAccountNumber,
-                dateOfJoining: editFormData.dateOfJoining,
-                addressProof: editFormData.addressProof,
-                department: editFormData.department,
-                location: editFormData.location,
-                idCardNumber: editFormData.idCardNumber,
-              }
+              ...emp,
+              name: editFormData.name,
+              fatherName: editFormData.fatherName,
+              phone: editFormData.phone,
+              role: editFormData.role,
+              panCard: editFormData.panCard,
+              bankAccountNumber: editFormData.bankAccountNumber,
+              dateOfJoining: editFormData.dateOfJoining,
+              addressProof: editFormData.addressProof,
+              department: finalDepartment,
+              location: finalLocation,
+              idCardNumber: editFormData.idCardNumber,
+            }
             : emp,
         ),
       );
@@ -782,33 +832,59 @@ export default function EmployeeDirectory({ users }: { users: UserType[] }) {
 
               {/* Row 3: Department and Location */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
+                <div className="grid gap-2">
                   <Label htmlFor="edit-department">Department *</Label>
-                  <Input
-                    id="edit-department"
+                  <Select
                     value={editFormData.department}
-                    onChange={(e) =>
-                      handleEditFormChange("department", e.target.value)
-                    }
-                    placeholder="Enter department"
-                  />
+                    onValueChange={(value) => handleEditFormChange("department", value)}
+                  >
+                    <SelectTrigger id="edit-department">
+                      <SelectValue placeholder="Select department" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {DEPARTMENTS.map((dept) => (
+                        <SelectItem key={dept} value={dept}>
+                          {dept}
+                        </SelectItem>
+                      ))}
+                      <SelectItem value="Other">Other</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  {editFormData.department === "Other" && (
+                    <Input
+                      id="edit-otherDepartment"
+                      placeholder="Enter your department"
+                      value={otherDepartment}
+                      onChange={(e) => setOtherDepartment(e.target.value)}
+                    />
+                  )}
                 </div>
-                <div>
+                <div className="grid gap-2">
                   <Label htmlFor="edit-location">Location *</Label>
                   <Select
                     value={editFormData.location}
-                    onValueChange={(value) =>
-                      handleEditFormChange("location", value)
-                    }
+                    onValueChange={(value) => handleEditFormChange("location", value)}
                   >
-                    <SelectTrigger>
-                      <SelectValue />
+                    <SelectTrigger id="edit-location">
+                      <SelectValue placeholder="Select location" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="Indore">Indore</SelectItem>
-                      <SelectItem value="Bhopal">Bhopal</SelectItem>
+                      {LOCATIONS.map((loc) => (
+                        <SelectItem key={loc} value={loc}>
+                          {loc}
+                        </SelectItem>
+                      ))}
+                      <SelectItem value="Other">Other</SelectItem>
                     </SelectContent>
                   </Select>
+                  {editFormData.location === "Other" && (
+                    <Input
+                      id="edit-otherLocation"
+                      placeholder="Enter your location"
+                      value={otherLocation}
+                      onChange={(e) => setOtherLocation(e.target.value)}
+                    />
+                  )}
                 </div>
               </div>
 

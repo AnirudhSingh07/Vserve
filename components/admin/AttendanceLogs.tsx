@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState , useEffect} from "react";
+import { useState, useEffect, useRef } from "react";
 import { Card, CardHeader, CardContent, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
@@ -119,7 +119,7 @@ const haversineMeters = (c1: { lat: number; lng: number }, c2: { lat: number; ln
   return R * c;
 };
 
-const WorkModeCell = ({ phone, date }: { phone: string; date: string }) => {
+const WorkModeCell = ({ phone, date, onModeLoaded }: { phone: string; date: string; onModeLoaded?: (mode: string) => void }) => {
   const [mode, setMode] = useState<"office" | "field" | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -149,17 +149,22 @@ const WorkModeCell = ({ phone, date }: { phone: string; date: string }) => {
               const insideOffice =
                 dIndore <= OFFICE_RADIUS_METERS || dBhopal <= OFFICE_RADIUS_METERS;
               setMode(insideOffice ? "office" : "field");
+              if (onModeLoaded) onModeLoaded(insideOffice ? "Office" : "Field");
             } else if (isMounted) {
               setMode(null);
+              if (onModeLoaded) onModeLoaded("—");
             }
           } else {
             if (isMounted) setMode(null);
+            if (onModeLoaded) onModeLoaded("—");
           }
         } else {
           if (isMounted) setMode(null);
+          if (onModeLoaded) onModeLoaded("—");
         }
       } catch {
         if (isMounted) setMode(null);
+        if (onModeLoaded) onModeLoaded("—");
       } finally {
         if (isMounted) setLoading(false);
       }
@@ -310,6 +315,7 @@ export default function AttendanceLogs({
   const router = useRouter();
   const [search, setSearch] = useState("");
   const [dateFilterType, setDateFilterType] = useState<DateFilterType>("today");
+  const workModesRef = useRef<Record<string, string>>({});
 
   const [allReportMonth, setAllReportMonth] = useState(() => {
     return new Date().toISOString().slice(0, 7);
@@ -599,6 +605,7 @@ export default function AttendanceLogs({
         "Date",
         "Status",
         "Check-In",
+        "Work Mode",
         "Check-Out",
         "Work Duration",
         "Km Distance",
@@ -634,8 +641,8 @@ export default function AttendanceLogs({
         const kmValue = dailyDistanceMap[kmKey];
         const distanceStr = (kmValue !== undefined && kmValue !== null) ? kmValue.toFixed(2) : "—";
         
-        const locKey = `${phone}__${d}`;
-        const locationCount = distinctLocationsMap[locKey];
+        const wmKey = `${phone}__${d}`;
+        const workMode = workModesRef.current[wmKey] || "—";
 
         lines.push(
           [
@@ -646,6 +653,7 @@ export default function AttendanceLogs({
             cell(d),
             cell(status),
             cell(inTime),
+            cell(workMode),
             cell(outTime),
             cell(duration),
             cell(distanceStr),
@@ -956,7 +964,13 @@ export default function AttendanceLogs({
                   </td>
                   <td className="px-3 sm:px-4 py-2">
                     {row.checkIn ? (
-                      <WorkModeCell phone={row.phone} date={row.date} />
+                      <WorkModeCell 
+                        phone={row.phone} 
+                        date={row.date} 
+                        onModeLoaded={(m) => {
+                          workModesRef.current[`${row.phone}__${normalizeDate(row.date)}`] = m;
+                        }}
+                      />
                     ) : (
                       <span className="text-gray-400">--</span>
                     )}
