@@ -25,10 +25,10 @@ export async function GET(req: Request) {
     const nowInTZ = dayjs().tz(userTimezone);
     const todayStart = nowInTZ.startOf("day").toDate();
 
-    // 3. Create 8:00 PM specifically in that timezone
+    // 3. Create 7:30 PM specifically in that timezone
     const checkoutTime = nowInTZ
-      .set("hour", 20)
-      .set("minute", 0)
+      .set("hour", 19)
+      .set("minute", 30)
       .set("second", 0)
       .set("millisecond", 0);
 

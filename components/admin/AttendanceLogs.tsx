@@ -875,9 +875,6 @@ export default function AttendanceLogs({
                   Name
                 </th>
                 <th className="px-3 sm:px-4 py-2 text-left text-xs sm:text-sm font-medium text-gray-500 uppercase">
-                  <Phone className="inline w-4 h-4 mr-1" /> Phone
-                </th>
-                <th className="px-3 sm:px-4 py-2 text-left text-xs sm:text-sm font-medium text-gray-500 uppercase">
                   <Calendar className="inline w-4 h-4 mr-1" /> Date
                 </th>
                 <th className="px-3 sm:px-4 py-2 text-left text-xs sm:text-sm font-medium text-gray-500 uppercase">
@@ -923,9 +920,6 @@ export default function AttendanceLogs({
                 >
                   <td className="px-3 sm:px-4 py-2 text-gray-700">
                     {row.name}
-                  </td>
-                  <td className="px-3 sm:px-4 py-2 text-gray-700">
-                    {row.phone}
                   </td>
                   <td className="px-3 sm:px-4 py-2 text-gray-700">
                     {extractDate(row.date)}
