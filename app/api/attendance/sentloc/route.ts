@@ -127,14 +127,46 @@ export async function GET(req: NextRequest) {
       (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
     );
 
+    // --- DEDUP PASS: Remove locations with same coords and close timestamps ---
+    // Two locations are considered duplicates if they are within 50m of each
+    // other AND within 60 seconds of each other.
+    const DEDUP_COORD_THRESHOLD_M = 50; // meters
+    const DEDUP_TIME_THRESHOLD_MS = 60 * 1000; // 60 seconds
+
+    const haversineM = (c1: { lat: number; lng: number }, c2: { lat: number; lng: number }) => {
+      const R = 6371e3;
+      const dLat = ((c2.lat - c1.lat) * Math.PI) / 180;
+      const dLon = ((c2.lng - c1.lng) * Math.PI) / 180;
+      const a =
+        Math.sin(dLat / 2) ** 2 +
+        Math.cos((c1.lat * Math.PI) / 180) *
+          Math.cos((c2.lat * Math.PI) / 180) *
+          Math.sin(dLon / 2) ** 2;
+      return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    };
+
+    const dedupedLocations: any[] = [];
+    for (const loc of allLocations) {
+      const locTime = new Date(loc.date).getTime();
+      const isDup = dedupedLocations.some((kept) => {
+        const keptTime = new Date(kept.date).getTime();
+        if (Math.abs(locTime - keptTime) > DEDUP_TIME_THRESHOLD_MS) return false;
+        if (!loc.coords || !kept.coords) return false;
+        return haversineM(loc.coords, kept.coords) <= DEDUP_COORD_THRESHOLD_M;
+      });
+      if (!isDup) {
+        dedupedLocations.push(loc);
+      }
+    }
+
     // console.log("Locations found:", allLocations.length, "for date:", targetDateStr);
 
     return NextResponse.json({
       employee,
       success: true,
       totalDistanceKm,
-      count: allLocations.length,
-      data: allLocations,
+      count: dedupedLocations.length,
+      data: dedupedLocations,
     });
   } catch (error) {
     console.error("Fetch SentLocation Error:", error);
@@ -420,17 +452,34 @@ export async function POST(req: NextRequest) {
     console.log("Total Today in DB:", updatedDailyRecord.totalKm);
 
     // --------------------------------------------------
-    // 📍 LOCATION BREADCRUMB
+    // 📍 DUPLICATE CHECK + LOCATION BREADCRUMB
     // --------------------------------------------------
-    const sentLocation = await SentLocation.create({
+    // Prevent saving a location if one already exists for this employee
+    // within the last 60 seconds at the same coordinates (~50m radius).
+    const DEDUP_SECONDS = 60;
+    const cutoff = new Date(timestamp.getTime() - DEDUP_SECONDS * 1000);
+
+    const recentDuplicate = await SentLocation.findOne({
       employeeId: employee._id,
-      date: timestamp,
-      hashalt: !!hashalt,
-      coords: {
-        lat: coords.lat,
-        lng: coords.lng,
-      },
+      date: { $gte: cutoff },
+      "coords.lat": { $gte: coords.lat - 0.0002, $lte: coords.lat + 0.0002 },
+      "coords.lng": { $gte: coords.lng - 0.0002, $lte: coords.lng + 0.0002 },
     });
+
+    if (recentDuplicate) {
+      // Duplicate detected — skip saving, still update employee state below
+      console.log("Duplicate location skipped for", employee.name);
+    } else {
+      await SentLocation.create({
+        employeeId: employee._id,
+        date: timestamp,
+        hashalt: !!hashalt,
+        coords: {
+          lat: coords.lat,
+          lng: coords.lng,
+        },
+      });
+    }
 
     // --------------------------------------------------
     // 🧠 EMPLOYEE STATE UPDATE (FORCE WRITE)
@@ -453,7 +502,7 @@ export async function POST(req: NextRequest) {
       { new: true }, // Return updated doc (optional)
     );
 
-    console.log("--- DEBUG DISTANCE END ---");
+
 
     return NextResponse.json({
       success: true,
