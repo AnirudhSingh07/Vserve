@@ -36,6 +36,28 @@ export async function POST(req: Request) {
       );
     }
 
+    // Date Validation: leaveFrom must be today or in the future
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const fromDate = new Date(leaveFrom);
+    fromDate.setHours(0, 0, 0, 0);
+    const toDate = new Date(leaveTo);
+    toDate.setHours(0, 0, 0, 0);
+
+    if (fromDate < today) {
+      return NextResponse.json(
+        { error: "Leave start date cannot be in the past" },
+        { status: 400 },
+      );
+    }
+
+    if (toDate < fromDate) {
+      return NextResponse.json(
+        { error: "Leave end date cannot be before start date" },
+        { status: 400 },
+      );
+    }
+
 
     // IMPROVED LOGIC:
     // Only save the slot if the frontend explicitly sent it (Morning or Afternoon)

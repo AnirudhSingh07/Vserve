@@ -7,6 +7,8 @@ import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 export default function LeaveRequestPage() {
+  // Today's date string for min attribute on date inputs
+  const todayStr = new Date().toISOString().split("T")[0];
   const { empphone } = useParams();
 
   // State Management
@@ -236,18 +238,22 @@ export default function LeaveRequestPage() {
                       type="date"
                       required
                       disabled={leaveType === "today"}
+                      min={todayStr}
                       className="w-full rounded-xl border border-gray-200 p-3 disabled:bg-gray-50"
                       value={formData.leaveFrom}
-                      onChange={(e) =>
+                      onChange={(e) => {
+                        const newFrom = e.target.value;
                         setFormData({
                           ...formData,
-                          leaveFrom: e.target.value,
+                          leaveFrom: newFrom,
                           leaveTo:
                             leaveType !== "range"
-                              ? e.target.value
-                              : formData.leaveTo,
-                        })
-                      }
+                              ? newFrom
+                              : formData.leaveTo && formData.leaveTo < newFrom
+                                ? newFrom
+                                : formData.leaveTo,
+                        });
+                      }}
                     />
                   </div>
                   {leaveType === "range" && (
@@ -258,6 +264,7 @@ export default function LeaveRequestPage() {
                       <input
                         type="date"
                         required
+                        min={formData.leaveFrom || todayStr}
                         className="w-full rounded-xl border border-gray-200 p-3"
                         value={formData.leaveTo}
                         onChange={(e) =>

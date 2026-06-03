@@ -75,6 +75,8 @@ export default function DashboardPage() {
     libraries,
   });
 
+  console.log("map key :", process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY);
+
   // This will trigger every time checkedIn actually changes
   useEffect(() => {
     console.log("Verified State Change - checkedIn is now:", checkedIn);
@@ -267,14 +269,40 @@ export default function DashboardPage() {
 
   // ✅ Updated: Handle Send Location with Loading State
   const handleSendLocation = async () => {
-    if (!coords || !userData?.phone) {
-      alert("Location or user missing");
+    if (!userData?.phone) {
+      alert("User data missing");
       return;
     }
 
     setIsSendingLocation(true); // Start loading
 
     try {
+      // 🔒 Always fetch a FRESH location to ensure device location is currently on
+      let freshCoords: { lat: number; lng: number };
+      try {
+        const perm = await Geolocation.requestPermissions();
+        if (perm.location !== "granted") {
+          alert("📍 Location permission denied. Please allow location access in your device settings and try again.");
+          return;
+        }
+        const position = await Geolocation.getCurrentPosition({
+          enableHighAccuracy: true,
+          timeout: 10000,
+        });
+        freshCoords = {
+          lat: position.coords.latitude,
+          lng: position.coords.longitude,
+        };
+        // Update the shared state with the fresh coordinates
+        setCoords(freshCoords);
+      } catch (locErr: any) {
+        console.error("Fresh location fetch failed:", locErr);
+        alert(
+          "📍 Unable to get your current location. Please make sure location services are turned ON and location permission is granted, then try again."
+        );
+        return;
+      }
+
       // 1️⃣ Check check-in status from backend
       const statusRes = await fetch("/api/attendance/ischeckin", {
         method: "POST",
@@ -295,7 +323,7 @@ export default function DashboardPage() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             phone: userData.phone,
-            coords,
+            coords: freshCoords,
           }),
         });
 
@@ -314,7 +342,7 @@ export default function DashboardPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           phone: userData.phone,
-          coords,
+          coords: freshCoords,
         }),
       });
 
@@ -339,14 +367,40 @@ export default function DashboardPage() {
 
   // ✅ Handle Halt Location  (Halt Location) with Loading State
   const handleSendHaltLocation = async () => {
-    if (!coords || !userData?.phone) {
-      alert("Location or user missing");
+    if (!userData?.phone) {
+      alert("User data missing");
       return;
     }
 
     setIsSendingHaltLocation(true); // Start loading
 
     try {
+      // 🔒 Always fetch a FRESH location to ensure device location is currently on
+      let freshCoords: { lat: number; lng: number };
+      try {
+        const perm = await Geolocation.requestPermissions();
+        if (perm.location !== "granted") {
+          alert("📍 Location permission denied. Please allow location access in your device settings and try again.");
+          return;
+        }
+        const position = await Geolocation.getCurrentPosition({
+          enableHighAccuracy: true,
+          timeout: 10000,
+        });
+        freshCoords = {
+          lat: position.coords.latitude,
+          lng: position.coords.longitude,
+        };
+        // Update the shared state with the fresh coordinates
+        setCoords(freshCoords);
+      } catch (locErr: any) {
+        console.error("Fresh location fetch failed:", locErr);
+        alert(
+          "📍 Unable to get your current location. Please make sure location services are turned ON and location permission is granted, then try again."
+        );
+        return;
+      }
+
       // 1️⃣ Check check-in status from backend
       const statusRes = await fetch("/api/attendance/ischeckin", {
         method: "POST",
@@ -367,7 +421,7 @@ export default function DashboardPage() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             phone: userData.phone,
-            coords,
+            coords: freshCoords,
           }),
         });
 
@@ -386,7 +440,7 @@ export default function DashboardPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           phone: userData.phone,
-          coords,
+          coords: freshCoords,
           hashalt: true,
         }),
       });
@@ -572,13 +626,12 @@ export default function DashboardPage() {
                   <button
                     onClick={handleCheckIn}
                     disabled={!canCheckIn || isCheckingIn}
-                    className={`px-6 py-3 rounded-full text-sm font-medium text-white transition flex items-center gap-2 ${
-                      isCheckingIn
+                    className={`px-6 py-3 rounded-full text-sm font-medium text-white transition flex items-center gap-2 ${isCheckingIn
                         ? "bg-blue-400 cursor-wait"
                         : canCheckIn
-                        ? "bg-blue-600 hover:bg-blue-700"
-                        : "bg-gray-400 cursor-not-allowed"
-                    }`}
+                          ? "bg-blue-600 hover:bg-blue-700"
+                          : "bg-gray-400 cursor-not-allowed"
+                      }`}
                   >
                     {isCheckingIn && (
                       <span className="inline-block h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
@@ -600,13 +653,12 @@ export default function DashboardPage() {
                   <button
                     onClick={() => setShowCheckoutModal(true)}
                     disabled={!checkedIn || isCheckingOut}
-                    className={`px-6 py-3 rounded-full text-sm font-medium text-white transition flex items-center gap-2 ${
-                      isCheckingOut
+                    className={`px-6 py-3 rounded-full text-sm font-medium text-white transition flex items-center gap-2 ${isCheckingOut
                         ? "bg-red-400 cursor-wait"
                         : checkedIn
-                        ? "bg-red-600 hover:bg-red-700"
-                        : "bg-gray-400 cursor-not-allowed"
-                    }`}
+                          ? "bg-red-600 hover:bg-red-700"
+                          : "bg-gray-400 cursor-not-allowed"
+                      }`}
                   >
                     {isCheckingOut && (
                       <span className="inline-block h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
@@ -631,8 +683,8 @@ export default function DashboardPage() {
                       onClick={handleSendLocation}
                       disabled={isSendingLocation || isSendingHaltLocation}
                       className={`px-6 py-3 rounded-full text-sm font-medium text-white transition ${isSendingLocation
-                          ? "bg-green-400 cursor-wait"
-                          : "bg-green-600 hover:bg-green-700"
+                        ? "bg-green-400 cursor-wait"
+                        : "bg-green-600 hover:bg-green-700"
                         }`}
                     >
                       {isSendingLocation
@@ -646,8 +698,8 @@ export default function DashboardPage() {
                       onClick={handleSendHaltLocation}
                       disabled={isSendingHaltLocation || isSendingLocation}
                       className={`px-6 py-3 rounded-full text-sm font-medium text-slate-900 transition shadow-sm ${isSendingHaltLocation
-                          ? "bg-yellow-300 cursor-wait opacity-70"
-                          : "bg-yellow-400 hover:bg-yellow-500"
+                        ? "bg-yellow-300 cursor-wait opacity-70"
+                        : "bg-yellow-400 hover:bg-yellow-500"
                         }`}
                     >
                       {isSendingHaltLocation ? "Sending..." : "Halt Location"}

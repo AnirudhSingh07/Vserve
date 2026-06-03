@@ -934,7 +934,7 @@ export default function AttendanceLogs({
                         .map(Number);
                       const checkInMinutes = hours * 60 + minutes;
                       const nineAM = 8 * 60;
-                      const tenAM = 9 * 60;
+                      const tenAM = 10 * 60;
                       let status =
                         checkInMinutes < nineAM || checkInMinutes > tenAM
                           ? "Late"

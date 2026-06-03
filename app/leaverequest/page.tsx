@@ -3,6 +3,8 @@
 import React, { useState, useEffect } from "react";
 
 export default function LeaveRequestPage() {
+  // Today's date string for min attribute on date inputs
+  const todayStr = new Date().toISOString().split("T")[0];
   const [formData, setFormData] = useState({
     phone: "",
     subject: "",
@@ -124,11 +126,20 @@ export default function LeaveRequestPage() {
               <input
                 type="date"
                 required
+                min={todayStr}
                 className="mt-1 block w-full rounded-lg border border-gray-300 p-3 focus:ring-2 focus:ring-blue-500 outline-none"
                 value={formData.leaveFrom}
-                onChange={(e) =>
-                  setFormData({ ...formData, leaveFrom: e.target.value })
-                }
+                onChange={(e) => {
+                  const newFrom = e.target.value;
+                  setFormData({
+                    ...formData,
+                    leaveFrom: newFrom,
+                    leaveTo:
+                      formData.leaveTo && formData.leaveTo < newFrom
+                        ? newFrom
+                        : formData.leaveTo,
+                  });
+                }}
               />
             </div>
             <div>
@@ -138,6 +149,7 @@ export default function LeaveRequestPage() {
               <input
                 type="date"
                 required
+                min={formData.leaveFrom || todayStr}
                 className="mt-1 block w-full rounded-lg border border-gray-300 p-3 focus:ring-2 focus:ring-blue-500 outline-none"
                 value={formData.leaveTo}
                 onChange={(e) =>
