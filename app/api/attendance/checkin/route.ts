@@ -22,7 +22,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, error: "Employee not found" });
 
     // ✅ Correct working hours (8 AM to 7.30 PM)
-    const WORK_START_HOUR = 0;   // 8:00 AM
+    const WORK_START_HOUR = 8;   // 8:00 AM
     const WORK_END_HOUR = 19.30;    // 7:30 PM
 
     // ✅ Use IST timezone
