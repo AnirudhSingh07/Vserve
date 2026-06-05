@@ -88,6 +88,7 @@ export default function AdminLeaveDashboard() {
     date: dayjs().tz(IST_TIMEZONE).format("YYYY-MM-DD"),
     leaveType: "half" as "half" | "full",
     shift: "Morning" as "Morning" | "Afternoon",
+    remark: "",
   });
   const [manualLoading, setManualLoading] = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState(false);
@@ -185,6 +186,7 @@ export default function AdminLeaveDashboard() {
           halfDaySlot: isFullDay ? undefined : manualForm.shift,
           subject: "Admin Assigned Leave",
           message: `Automatically approved by administrator (${isFullDay ? "Full Day" : `Half Day – ${manualForm.shift}`}).`,
+          isAdminAssigned: true,
         }),
       });
 
@@ -202,6 +204,7 @@ export default function AdminLeaveDashboard() {
           requestId: createdRequest._id,
           employeeId: createdRequest.employeeId,
           action: "accept",
+          remark: manualForm.remark.trim() || undefined,
         }),
       });
 
@@ -216,6 +219,7 @@ export default function AdminLeaveDashboard() {
         date: dayjs().tz(IST_TIMEZONE).format("YYYY-MM-DD"),
         leaveType: "half",
         shift: "Morning",
+        remark: "",
       });
       fetchRequests(); // Refresh the list entirely
     } catch (err: any) {
@@ -944,6 +948,25 @@ export default function AdminLeaveDashboard() {
                     </div>
                   </div>
                 )}
+
+                {/* Admin Remark */}
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wide mb-2">
+                    Admin Remark <span className="text-slate-400 font-normal normal-case tracking-normal">(optional)</span>
+                  </label>
+                  <textarea
+                    rows={3}
+                    placeholder="e.g. Approved for personal reasons, cover arranged."
+                    value={manualForm.remark}
+                    onChange={(e) =>
+                      setManualForm({ ...manualForm, remark: e.target.value })
+                    }
+                    className="w-full px-4 py-3.5 sm:py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-700 outline-none focus:ring-2 focus:ring-indigo-500 resize-none placeholder:text-slate-300 transition-shadow"
+                  />
+                  <p className="text-[11px] text-slate-400 mt-1.5">
+                    This remark will be visible to the employee.
+                  </p>
+                </div>
 
                 <div className="pt-2 sm:pt-0 pb-2 sm:pb-0">
                   <button

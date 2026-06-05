@@ -17,6 +17,7 @@ export async function POST(req: Request) {
       subject,
       message,
       halfDaySlot, // This is the key field from your frontend
+      isAdminAssigned, // Flag to allow past-date leave assignment from admin
     } = body;
 
     const employee = await Employee.findOne({ phone: phoneNo });
@@ -36,7 +37,7 @@ export async function POST(req: Request) {
       );
     }
 
-    // Date Validation: leaveFrom must be today or in the future
+    // Date Validation: leaveFrom must be today or in the future (only for non-admin requests)
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const fromDate = new Date(leaveFrom);
@@ -44,7 +45,7 @@ export async function POST(req: Request) {
     const toDate = new Date(leaveTo);
     toDate.setHours(0, 0, 0, 0);
 
-    if (fromDate < today) {
+    if (!isAdminAssigned && fromDate < today) {
       return NextResponse.json(
         { error: "Leave start date cannot be in the past" },
         { status: 400 },
