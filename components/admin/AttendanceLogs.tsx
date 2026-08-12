@@ -12,6 +12,15 @@ import {
   CheckCircle,
   AlertCircle,
   Search,
+ IdCardLanyard,
+  BriefcaseBusiness,
+  CheckCheck,
+  ScanLine,
+  MapPinCheck,
+  ShieldQuestionMark,
+  MapPinned,
+  Bike,
+  Info,
   ArrowRight,
   Loader2,
   MapPin,
@@ -29,6 +38,11 @@ type AttendanceRow = {
   checkOut?: string;
   location?: string;
   department?: string;
+  work_mode?: string;
+  first_visit?: { lat: number; lng: number; time: string };
+  last_visit?: { lat: number; lng: number; time: string };
+  km?: number;
+  locations_cover?: number;
 };
 
 interface AttendanceLogsProps {
@@ -40,66 +54,7 @@ interface AttendanceLogsProps {
   dailyDistanceMap?: Record<string, number>;
 }
 
-const LocationCountCell = ({ phone, date }: { phone: string; date: string }) => {
-  const [count, setCount] = useState<number | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  // Replicate the exact date formatting used in handleRowClick
-  const formattedDate = date.split("T")[0].split(" ")[0];
-
-  useEffect(() => {
-    let isMounted = true;
-    const fetchLocations = async () => {
-      try {
-        const res = await fetch(
-          `/api/attendance/sentloc?phone=${phone}&date=${formattedDate}`
-        );
-        if (res.ok) {
-          const result = await res.json();
-          if (result.success && result.data) {
-            // Get total location length and subtract the ones we don't want
-            const totalLocations = result.data.length;
-            const invalidLocations = result.data.filter(
-              (loc: any) => loc.isCheckIn || loc.isCheckOut || loc.hashalt
-            ).length;
-            
-            const validCount = totalLocations - invalidLocations;
-            
-            if (isMounted) setCount(validCount);
-          } else {
-            if (isMounted) setCount(0);
-          }
-        } else {
-          if (isMounted) setCount(0);
-        }
-      } catch (err) {
-        if (isMounted) setCount(0);
-      } finally {
-        if (isMounted) setLoading(false);
-      }
-    };
-
-    fetchLocations();
-
-    return () => {
-      isMounted = false;
-    };
-  }, [phone, formattedDate]);
-
-  if (loading) {
-    return <Loader2 className="w-4 h-4 animate-spin text-slate-300" />;
-  }
-
-  if (count === 0 || count === null) {
-    return <span className="text-gray-400">--</span>;
-  }
-
-  return (
-    <span className="inline-flex items-center gap-1 text-gray-700 ">
-      {count}
-    </span>
-  );
-};
+// LocationCountCell removed as data comes from backend
 
 // Office location constants (must match dashboard/page.tsx)
 const OFFICE_CENTER = { lat: 22.723541, lng: 75.884507 };
@@ -119,189 +74,7 @@ const haversineMeters = (c1: { lat: number; lng: number }, c2: { lat: number; ln
   return R * c;
 };
 
-const WorkModeCell = ({ phone, date, onModeLoaded }: { phone: string; date: string; onModeLoaded?: (mode: string) => void }) => {
-  const [mode, setMode] = useState<"office" | "field" | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  const formattedDate = date.split("T")[0].split(" ")[0];
-
-  useEffect(() => {
-    let isMounted = true;
-    const fetchFirstVisit = async () => {
-      try {
-        const res = await fetch(
-          `/api/attendance/sentloc?phone=${phone}&date=${formattedDate}`
-        );
-        if (res.ok) {
-          const result = await res.json();
-          if (result.success && result.data && result.data.length > 0) {
-            // Find the first valid location (including check-in, excluding check-out and 0,0)
-            const firstVisit = result.data.find((loc: any) => {
-              if (!loc.coords || typeof loc.coords.lat !== "number") return false;
-              if (loc.coords.lat === 0 && loc.coords.lng === 0) return false;
-              if (loc.isCheckOut) return false;
-              return true;
-            });
-
-            if (firstVisit && isMounted) {
-              const dIndore = haversineMeters(firstVisit.coords, OFFICE_CENTER);
-              const dBhopal = haversineMeters(firstVisit.coords, BHOPAL_OFFICE_CENTER);
-              const insideOffice =
-                dIndore <= OFFICE_RADIUS_METERS || dBhopal <= OFFICE_RADIUS_METERS;
-              setMode(insideOffice ? "office" : "field");
-              if (onModeLoaded) onModeLoaded(insideOffice ? "Office" : "Field");
-            } else if (isMounted) {
-              setMode(null);
-              if (onModeLoaded) onModeLoaded("—");
-            }
-          } else {
-            if (isMounted) setMode(null);
-            if (onModeLoaded) onModeLoaded("—");
-          }
-        } else {
-          if (isMounted) setMode(null);
-          if (onModeLoaded) onModeLoaded("—");
-        }
-      } catch {
-        if (isMounted) setMode(null);
-        if (onModeLoaded) onModeLoaded("—");
-      } finally {
-        if (isMounted) setLoading(false);
-      }
-    };
-
-    fetchFirstVisit();
-    return () => { isMounted = false; };
-  }, [phone, formattedDate]);
-
-  if (loading) {
-    return <Loader2 className="w-4 h-4 animate-spin text-slate-300" />;
-  }
-
-  if (mode === null) {
-    return <span className="text-gray-400">--</span>;
-  }
-
-  return mode === "field" ? (
-    <span className="inline-flex items-center gap-1 rounded-full bg-green-50 px-2.5 py-1 text-xs font-semibold text-green-700 ring-1 ring-inset ring-green-600/20">
-      <MapPin className="w-3 h-3" /> Field
-    </span>
-  ) : (
-    <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700 ring-1 ring-inset ring-blue-600/20">
-      <Building className="w-3 h-3" /> Office
-    </span>
-  );
-};
-
-// ── First Visit / Last Visit Cell ──────────────────────────────────────────
-// Reuses the same sentloc API and office-radius logic from the sentlocation page.
-const FirstLastVisitCell = ({ phone, date }: { phone: string; date: string }) => {
-  const [firstVisit, setFirstVisit] = useState<{ lat: number; lng: number; time: string } | null>(null);
-  const [lastVisit, setLastVisit] = useState<{ lat: number; lng: number; time: string } | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  const formattedDate = date.split("T")[0].split(" ")[0];
-
-  useEffect(() => {
-    let isMounted = true;
-    const fetchVisits = async () => {
-      try {
-        const res = await fetch(
-          `/api/attendance/sentloc?phone=${phone}&date=${formattedDate}`
-        );
-        if (!res.ok) { if (isMounted) setLoading(false); return; }
-
-        const result = await res.json();
-        if (!result.success || !result.data || result.data.length === 0) {
-          if (isMounted) setLoading(false);
-          return;
-        }
-
-        const locs: any[] = result.data;
-
-        // First Visit: first location OUTSIDE office radius (same as sentlocation page)
-        const first = locs.find((loc: any) => {
-          if (!loc.coords || typeof loc.coords.lat !== "number") return false;
-          if (loc.coords.lat === 0 && loc.coords.lng === 0) return false;
-          const dIndore = haversineMeters(loc.coords, OFFICE_CENTER);
-          const dBhopal = haversineMeters(loc.coords, BHOPAL_OFFICE_CENTER);
-          return dIndore > OFFICE_RADIUS_METERS && dBhopal > OFFICE_RADIUS_METERS;
-        });
-
-        // Last Visit: last valid non-0,0 location (same as sentlocation page)
-        let last = null;
-        for (let i = locs.length - 1; i >= 0; i--) {
-          const loc = locs[i];
-          if (!loc.coords) continue;
-          if (loc.coords.lat === 0 && loc.coords.lng === 0) continue;
-          last = loc;
-          break;
-        }
-
-        if (isMounted) {
-          if (first) {
-            setFirstVisit({
-              lat: first.coords.lat,
-              lng: first.coords.lng,
-              time: new Date(first.date).toLocaleTimeString("en-IN", {
-                timeZone: "Asia/Kolkata", hour: "2-digit", minute: "2-digit",
-              }),
-            });
-          }
-          if (last) {
-            setLastVisit({
-              lat: last.coords.lat,
-              lng: last.coords.lng,
-              time: new Date(last.date).toLocaleTimeString("en-IN", {
-                timeZone: "Asia/Kolkata", hour: "2-digit", minute: "2-digit",
-              }),
-            });
-          }
-        }
-      } catch {
-        // silently fail
-      } finally {
-        if (isMounted) setLoading(false);
-      }
-    };
-
-    fetchVisits();
-    return () => { isMounted = false; };
-  }, [phone, formattedDate]);
-
-  if (loading) {
-    return (
-      <>
-        <td className="px-3 sm:px-4 py-2"><Loader2 className="w-4 h-4 animate-spin text-slate-300" /></td>
-        <td className="px-3 sm:px-4 py-2"><Loader2 className="w-4 h-4 animate-spin text-slate-300" /></td>
-      </>
-    );
-  }
-
-  const renderVisit = (visit: { lat: number; lng: number; time: string } | null, color: string) => {
-    if (!visit) return <span className="text-gray-400">--</span>;
-    return (
-      <a
-        href={`https://www.google.com/maps?q=${visit.lat},${visit.lng}`}
-        target="_blank"
-        rel="noopener noreferrer"
-        onClick={(e) => e.stopPropagation()}
-        className={`inline-flex items-center gap-1 text-xs font-medium ${color} hover:underline`}
-        title={`${visit.lat.toFixed(6)}, ${visit.lng.toFixed(6)}`}
-      >
-        <Navigation className="w-3 h-3" />
-        {visit.time}
-      </a>
-    );
-  };
-
-  return (
-    <>
-      <td className="px-3 sm:px-4 py-2">{renderVisit(firstVisit, "text-green-600")}</td>
-      <td className="px-3 sm:px-4 py-2">{renderVisit(lastVisit, "text-red-600")}</td>
-    </>
-  );
-};
+// WorkModeCell and FirstLastVisitCell removed as data comes from backend
 
 type DateFilterType = "today" | "yesterday" | "date" | "range" | "all";
 
@@ -641,8 +414,7 @@ export default function AttendanceLogs({
         const kmValue = dailyDistanceMap[kmKey];
         const distanceStr = (kmValue !== undefined && kmValue !== null) ? kmValue.toFixed(2) : "—";
         
-        const wmKey = `${phone}__${d}`;
-        const workMode = workModesRef.current[wmKey] || "—";
+        const workMode = r?.work_mode || "—";
 
         lines.push(
           [
@@ -729,12 +501,12 @@ export default function AttendanceLogs({
 
   console.log("Filtered rows data: ", filteredRows);
   return (
-    <Card className="shadow-lg border-0 overflow-hidden w-full">
-      <CardHeader className=" bg-gradient-to-r from-slate-50 to-purple-50 border-b px-4 sm:px-6 py-4">
+    <Card className="border-0 overflow-hidden w-full bg-transparent shadow-none">
+      <CardHeader className="bg-gradient-to-r from-blue-50 to-white border-b border-gray-200 px-4 sm:px-6 py-4">
         <div className="flex flex-col 2xl:flex-row 2xl:items-center 2xl:justify-between gap-4">
           <div className="flex items-center gap-3">
-            <div className="bg-purple-100 p-2 rounded-lg flex-shrink-0">
-              <Clock className="w-5 h-5 sm:w-6 sm:h-6 text-purple-600" />
+            <div className="bg-blue-100 p-2 rounded-lg flex-shrink-0">
+              <Clock className="w-5 h-5 sm:w-6 sm:h-6 text-blue-600" />
             </div>
             <div>
               <CardTitle className="text-lg sm:text-2xl font-semibold">
@@ -756,7 +528,7 @@ export default function AttendanceLogs({
                   placeholder="Search name, phone, date..."
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
-                  className="w-full pl-9 pr-3 py-2 text-sm border rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 bg-white"
+                className="w-full pl-9 pr-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
                 />
               </div>
 
@@ -766,7 +538,7 @@ export default function AttendanceLogs({
                   onChange={(e) =>
                     setDateFilterType(e.target.value as DateFilterType)
                   }
-                  className="px-3 py-2 w-full sm:w-auto text-sm border rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 bg-white"
+                  className="px-3 py-2 w-full sm:w-auto text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
                 >
                   <option value="today">Today</option>
                   <option value="yesterday">Yesterday</option>
@@ -781,7 +553,7 @@ export default function AttendanceLogs({
                       type="date"
                       value={selectedDate}
                       onChange={(e) => setSelectedDate(e.target.value)}
-                      className="w-full px-3 py-2 text-sm border rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 bg-white"
+                      className="w-full px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
                     />
                   </div>
                 )}
@@ -793,7 +565,7 @@ export default function AttendanceLogs({
                         type="date"
                         value={fromDate}
                         onChange={(e) => setFromDate(e.target.value)}
-                        className="w-full px-2 py-2 text-sm border rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 bg-white"
+                        className="w-full px-2 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
                       />
                     </div>
                     <ArrowRight className="w-4 h-4 text-gray-400 hidden sm:block flex-shrink-0 mx-auto" />
@@ -803,7 +575,7 @@ export default function AttendanceLogs({
                         value={toDate}
                         onChange={(e) => setToDate(e.target.value)}
                         min={fromDate}
-                        className="w-full px-2 py-2 text-sm border rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 bg-white"
+                        className="w-full px-2 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
                       />
                     </div>
                   </div>
@@ -812,8 +584,8 @@ export default function AttendanceLogs({
             </div>
 
             {/* Action Buttons */}
-            <div className="flex flex-col m-5 sm:flex-row items-stretch sm:items-center gap-2 w-full xl:w-auto flex-shrink-0 xl:border-l xl:border-gray-200 xl:pl-3">
-              <div className="flex bg-white sm:bg-slate-100 gap-5 rounded-md sm:rounded-lg items-center text-sm w-full sm:w-auto border sm:border-0">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full xl:w-auto flex-shrink-0 xl:border-l xl:border-gray-200 xl:pl-3 mt-2 sm:mt-0">
+              <div className="flex bg-white sm:bg-slate-100 gap-2 sm:gap-5 rounded-md sm:rounded-lg items-center text-sm w-full sm:w-auto border sm:border-0">
                 <input
                   type="month"
                   value={allReportMonth}
@@ -825,7 +597,7 @@ export default function AttendanceLogs({
                   disabled={isDownloadingAll}
                   variant="ghost"
                   size="sm"
-                  className="text-purple-700  hover:bg-slate-200 h-8 px-3 shrink-0 bg-slate-100 sm:bg-transparent ml-2 sm:ml-0"
+                  className="text-blue-700 hover:bg-blue-50 h-8 px-3 shrink-0 ml-2 sm:ml-0"
                 >
                   {isDownloadingAll ? (
                     <Loader2 className="w-4 h-4 mr-2 animate-spin" />
@@ -838,7 +610,7 @@ export default function AttendanceLogs({
 
               <Button
                 onClick={handleDownloadCSV}
-                className="bg-purple-600 m-10 hover:bg-purple-700 text-white shadow-md w-full sm:w-auto lg:h-10 shrink-0"
+                className="bg-blue-600 hover:bg-blue-700 text-white shadow-md w-full sm:w-auto lg:h-10 shrink-0"
               >
                 <Download className="w-4 h-4 mr-2" />
                 Today Report
@@ -849,16 +621,16 @@ export default function AttendanceLogs({
 
         {/* NEW Snapshot Metrics */}
         {totalEmployees !== undefined && (
-          <div className="flex flex-wrap items-center gap-4 mt-4 pt-4 border-t border-purple-100/50">
-            <div className="bg-white/60 px-4 py-3 rounded-lg border border-purple-100 flex-1 min-w-[140px] shadow-sm">
-              <p className="text-xs text-slate-500 font-semibold uppercase tracking-wider">Total Employees</p>
-              <p className="text-2xl font-bold text-slate-800 mt-1.5">{totalEmployeesCount}</p>
+          <div className="flex flex-wrap items-center gap-4 mt-4 pt-4 border-t border-blue-100">
+            <div className="bg-white/80 px-4 py-3 rounded-xl border border-blue-100 flex-1 min-w-[140px] shadow-sm">
+              <p className="text-xs text-gray-500 font-semibold uppercase tracking-wider">Total Employees</p>
+              <p className="text-2xl font-bold text-gray-800 mt-1.5">{totalEmployeesCount}</p>
             </div>
-            <div className="bg-white/60 px-4 py-3 rounded-lg border border-green-100 flex-1 min-w-[140px] shadow-sm">
+            <div className="bg-white/80 px-4 py-3 rounded-xl border border-green-100 flex-1 min-w-[140px] shadow-sm">
               <p className="text-xs text-green-600 font-semibold uppercase tracking-wider">Present Today</p>
               <p className="text-2xl font-bold text-green-700 mt-1.5">{totalAttendanceToday}</p>
             </div>
-            <div className="bg-white/60 px-4 py-3 rounded-lg border border-orange-100 flex-1 min-w-[140px] shadow-sm">
+            <div className="bg-white/80 px-4 py-3 rounded-xl border border-orange-100 flex-1 min-w-[140px] shadow-sm">
               <p className="text-xs text-orange-600 font-semibold uppercase tracking-wider">Absent (Today)</p>
               <p className="text-2xl font-bold text-orange-700 mt-1.5">{remainingToday}</p>
             </div>
@@ -866,47 +638,46 @@ export default function AttendanceLogs({
         )}
       </CardHeader>
 
-      <CardContent className="p-0 overflow-x-auto">
-        <div className="w-full overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200 text-sm sm:text-base">
+      <CardContent className="p-0">
+        <div className="overflow-x-auto w-full">
+          <table className="w-full whitespace-nowrap divide-y divide-gray-200 text-xs sm:text-sm">
             <thead className="bg-gray-50">
               <tr>
-                <th className="px-3 sm:px-4 py-2 text-left text-xs sm:text-sm font-medium text-gray-500 uppercase">
-                  Name
+                <th className="px-2 sm:px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase leading-tight">
+                <IdCardLanyard className="inline w-3 h-3 mr-0.5"/> Name
                 </th>
-                <th className="px-3 sm:px-4 py-2 text-left text-xs sm:text-sm font-medium text-gray-500 uppercase">
-                  <Calendar className="inline w-4 h-4 mr-1" /> Date
+                <th className="px-2 sm:px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase leading-tight">
+                  <Calendar className="inline w-3 h-3 mr-0.5" /> Date
                 </th>
-                <th className="px-3 sm:px-4 py-2 text-left text-xs sm:text-sm font-medium text-gray-500 uppercase">
-                  Status
+                <th className="px-2 sm:px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase leading-tight">
+                 <Info className="inline w-3 h-3 mr-0.5"/> Status
                 </th>
-                <th className="px-3 sm:px-4 py-2 text-left text-xs sm:text-sm font-medium text-gray-500 uppercase">
-                  Check-in
+                <th className="px-2 sm:px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase leading-tight">
+                 <CheckCheck className="inline w-3 h-3 mr-0.5"/> Check-in
                 </th>
-                <th className="px-3 sm:px-4 py-2 text-left text-xs sm:text-sm font-medium text-gray-500 uppercase">
-                  <MapPin className="inline w-4 h-4 mr-1" /> Work Mode
+                <th className="px-2 sm:px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase leading-tight">
+                  <BriefcaseBusiness className="inline w-3 h-3 mr-0.5" /> Work Mode
                 </th>
-                <th className="px-3 sm:px-4 py-2 text-left text-xs sm:text-sm font-medium text-gray-500 uppercase">
-                  Check-Out
+                <th className="px-2 sm:px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase leading-tight">
+                 <ScanLine className="inline w-3 h-3 mr-0.5"/> Check-Out
                 </th>
-                <th className="px-3 sm:px-4 py-2 text-left text-xs sm:text-sm font-medium text-gray-500 uppercase">
-                  Location
+                <th className="px-2 sm:px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase leading-tight">
+                <MapPinned className="inline w-3 h-3 mr-0.5"/> Location
                 </th>
-                <th className="px-3 sm:px-4 py-2 text-left text-xs sm:text-sm font-medium text-gray-500 uppercase">
-                  Department
+                <th className="px-2 sm:px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase leading-tight">
+                 <ShieldQuestionMark className="inline w-3 h-3 mr-0.5"/> Dept
                 </th>
-                <th className="px-3 sm:px-4 py-2 text-left text-xs sm:text-sm font-medium text-gray-500 uppercase">
-                  <MapPin className="inline w-4 h-4 mr-1 text-green-500" /> First Visit
+                <th className="px-2 sm:px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase leading-tight">
+                  <MapPin className="inline w-3 h-3 mr-0.5 text-green-500" /> First Visit
                 </th>
-                <th className="px-3 sm:px-4 py-2 text-left text-xs sm:text-sm font-medium text-gray-500 uppercase">
-                  <MapPin className="inline w-4 h-4 mr-1 text-red-500" /> Last Visit
+                <th className="px-2 sm:px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase leading-tight">
+                  <MapPin className="inline w-3 h-3 mr-0.5 text-red-500" /> Last Visit
                 </th>
-                <th className="px-3 sm:px-4 py-2 text-left text-xs sm:text-sm font-medium text-gray-500 uppercase">
-                  Km
+                <th className="px-2 sm:px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase leading-tight">
+                 <Bike className="inline w-4 h-4 mr-1"/> Km
                 </th>
-                <th className="px-3 sm:px-4 py-2 text-left text-xs sm:text-sm font-medium text-gray-500 uppercase">
-                  
-                  Locations
+                <th className="px-2 sm:px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase leading-tight">
+                <MapPinCheck className="inline w-3 h-3 mr-0.5"/> Locs
                 </th>
               </tr>
             </thead>
@@ -918,14 +689,14 @@ export default function AttendanceLogs({
                   onClick={() => handleRowClick(row.phone, row.date)}
                   className="hover:bg-gray-50 transition-colors cursor-pointer"
                 >
-                  <td className="px-3 sm:px-4 py-2 text-gray-700">
+                  <td className="px-2 sm:px-3 py-1.5 text-gray-700">
                     {row.name}
                   </td>
-                  <td className="px-3 sm:px-4 py-2 text-gray-700">
+                  <td className="px-2 sm:px-3 py-1.5 text-gray-700">
                     {extractDate(row.date)}
                   </td>
 
-                  <td className="px-3 sm:px-4 py-2">
+                  <td className="px-2 sm:px-3 py-1.5">
                     {(() => {
                       if (!row.checkIn)
                         return <span className="text-gray-400">--</span>;
@@ -953,55 +724,85 @@ export default function AttendanceLogs({
                   </td>
 
                   {/* ✅ Applied 12-hour formatting here */}
-                  <td className="px-3 sm:px-4 py-2 text-gray-700">
+                  <td className="px-2 sm:px-3 py-1.5 text-gray-700">
                     {formatTo12Hour(row.checkIn)}
                   </td>
-                  <td className="px-3 sm:px-4 py-2">
-                    {row.checkIn ? (
-                      <WorkModeCell 
-                        phone={row.phone} 
-                        date={row.date} 
-                        onModeLoaded={(m) => {
-                          workModesRef.current[`${row.phone}__${normalizeDate(row.date)}`] = m;
-                        }}
-                      />
+                  <td className="px-2 sm:px-3 py-1.5">
+                    {row.work_mode && row.work_mode !== "—" ? (
+                      row.work_mode === "Field" ? (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-green-50 px-2.5 py-1 text-xs font-semibold text-green-700 ring-1 ring-inset ring-green-600/20">
+                          <MapPin className="w-3 h-3" /> Field
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700 ring-1 ring-inset ring-blue-600/20">
+                          <Building className="w-3 h-3" /> Office
+                        </span>
+                      )
                     ) : (
                       <span className="text-gray-400">--</span>
                     )}
                   </td>
-                  <td className="px-3 sm:px-4 py-2 text-gray-700">
+                  <td className="px-2 sm:px-3 py-1.5 text-gray-700">
                     {formatTo12Hour(row.checkOut)}
                   </td>
-                  <td className="px-3 sm:px-4 py-2 text-gray-700">
+                  <td className="px-2 sm:px-3 py-1.5 text-gray-700">
                     {row.location || "—"}
                   </td>
-                  <td className="px-3 sm:px-4 py-2 text-gray-700">
+                  <td className="px-2 sm:px-3 py-1.5 text-gray-700">
                     {row.department || "—"}
                   </td>
                   {/* First Visit & Last Visit Columns */}
-                  {row.checkIn ? (
-                    <FirstLastVisitCell phone={row.phone} date={row.date} />
+                  {row.first_visit && row.first_visit.lat !== undefined ? (
+                    <td className="px-2 sm:px-3 py-1.5">
+                      <a
+                        href={`https://www.google.com/maps?q=${row.first_visit.lat},${row.first_visit.lng}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={(e) => e.stopPropagation()}
+                        className="inline-flex items-center gap-1 text-xs font-medium text-green-600 hover:underline"
+                        title={`${Number(row.first_visit.lat).toFixed(6)}, ${Number(row.first_visit.lng).toFixed(6)}`}
+                      >
+                        <Navigation className="w-3 h-3" />
+                        {row.first_visit.time}
+                      </a>
+                    </td>
                   ) : (
-                    <>
-                      <td className="px-3 sm:px-4 py-2"><span className="text-gray-400">--</span></td>
-                      <td className="px-3 sm:px-4 py-2"><span className="text-gray-400">--</span></td>
-                    </>
+                    <td className="px-2 sm:px-3 py-1.5"><span className="text-gray-400">--</span></td>
                   )}
-                  <td className="px-3 sm:px-4 py-2">
-                    {(() => {
-                      const km = dailyDistanceMap[buildDistanceKey(row.phone, row.date)];
-                      if (km === undefined || km === null) {
-                        return <span className="text-gray-400">—</span>;
-                      }
-                      return (
-                        <span className="inline-flex items-center gap-1 text-gray-700 whitespace-nowrap">
-                          {km.toFixed(2)} km
-                        </span>
-                      );
-                    })()}
+                  {row.last_visit && row.last_visit.lat !== undefined ? (
+                    <td className="px-2 sm:px-3 py-1.5">
+                      <a
+                        href={`https://www.google.com/maps?q=${row.last_visit.lat},${row.last_visit.lng}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={(e) => e.stopPropagation()}
+                        className="inline-flex items-center gap-1 text-xs font-medium text-red-600 hover:underline"
+                        title={`${Number(row.last_visit.lat).toFixed(6)}, ${Number(row.last_visit.lng).toFixed(6)}`}
+                      >
+                        <Navigation className="w-3 h-3" />
+                        {row.last_visit.time}
+                      </a>
+                    </td>
+                  ) : (
+                    <td className="px-2 sm:px-3 py-1.5"><span className="text-gray-400">--</span></td>
+                  )}
+                  <td className="px-2 sm:px-3 py-1.5">
+                    {row.km !== undefined && row.km !== null ? (
+                      <span className="inline-flex items-center gap-1 text-gray-700 whitespace-nowrap">
+                        {row.km.toFixed(2)} km
+                      </span>
+                    ) : (
+                      <span className="text-gray-400">—</span>
+                    )}
                   </td>
-                  <td className="px-3 sm:px-4 py-2">
-                    <LocationCountCell phone={row.phone} date={row.date} />
+                  <td className="px-2 sm:px-3 py-1.5">
+                    {row.locations_cover !== undefined && row.locations_cover !== null ? (
+                      <span className="inline-flex items-center gap-1 text-gray-700">
+                        {row.locations_cover}
+                      </span>
+                    ) : (
+                      <span className="text-gray-400">—</span>
+                    )}
                   </td>
                 </tr>
               ))}

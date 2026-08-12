@@ -12,7 +12,7 @@ const DailyDistanceSchema = new Schema({
   employeeId: { type: Schema.Types.ObjectId, ref: "Employee", required: true },
   date: { type: String, required: true }, // Format: "2024-05-20"
   totalKm: { type: Number, default: 0 }
-});
+}, { timestamps: true });
 // This ensures we only have one entry per employee per day
 DailyDistanceSchema.index({ employeeId: 1, date: 1 }, { unique: true });
 

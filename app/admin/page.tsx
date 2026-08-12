@@ -4,10 +4,10 @@ import AdminPanel from "@/components/admin/AdminPanel";
 import NavBar from "@/components/Navbar";
 export default function AdminPage() {
   return (
-    <div>
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-blue-100">
       <NavBar />
-      <main className="p-2 max-w-10xl mx-auto mt-20">
-        <h1 className="text-3xl text-center text-black font-bold mb-4 text-balance ">
+      <main className="max-w-screen-2xl mx-auto px-3 sm:px-6 pt-20 pb-10">
+        <h1 className="text-2xl md:text-3xl text-center font-semibold text-gray-800 mb-6">
           Admin Panel
         </h1>
         <AdminPanel />

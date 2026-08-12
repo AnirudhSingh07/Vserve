@@ -2,10 +2,8 @@
 
 import { UserPlus } from "lucide-react";
 import AttendanceLogs from "../admin/AttendanceLogs";
-import LateRequests from "../admin/LateRequests";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useEffect, useMemo, useState, useRef } from "react";
 import { Loader2, AlertCircle, User } from "lucide-react";
 
 type User = {
@@ -68,52 +66,100 @@ export default function AdminPanel() {
     return map;
   }, [users]);
 
+  const lastSyncRef = useRef<string | null>(null);
+
   useEffect(() => {
-    const fetchData = async () => {
+    const fetchData = async (isBackground = false) => {
       try {
-        setLoading(true);
-        const [adminRes, empRes, distRes] = await Promise.all([
-          fetch("/api/me", { credentials: "include" }),
-          fetch("/api/employees"),
-          fetch("/api/attendance/daily-distance"),
-        ]);
+        if (!isBackground && rawAttendance.length === 0) setLoading(true);
 
-        
+        const currentLastSync = lastSyncRef.current;
 
-        if (!adminRes.ok) throw new Error("Failed to fetch admin data");
-        if (!empRes.ok) throw new Error("Failed to fetch employee list");
+        // Fetch admin info and employee directory only initially (not on background polls)
+        if (!isBackground) {
+          const [adminRes, empRes] = await Promise.all([
+            fetch("/api/me", { credentials: "include" }),
+            fetch("/api/employees"),
+          ]);
 
-        const adminData = await adminRes.json();
-        const empData = await empRes.json();
+          if (!adminRes.ok) throw new Error("Failed to fetch admin data");
+          if (!empRes.ok) throw new Error("Failed to fetch employee list");
 
-        setAdmin(adminData.employee || null);
-        setUsers(empData.employees || []);
+          const adminData = await adminRes.json();
+          const empData = await empRes.json();
 
-        // 🔹 ADDED: store daily distance map
-        if (distRes.ok) {
-          const distData = await distRes.json();
-          setDailyDistanceMap(distData.distanceMap || {});
+          setAdmin(adminData.employee || null);
+          setUsers(empData.employees || []);
         }
 
-        const attRes = await fetch("/api/attendance/allattendance", {
-          credentials: "include",
-        });
+        // Fetch daily distance (full map initially, incremental updates during polling)
+        const distUrl = currentLastSync
+          ? `/api/attendance/daily-distance?since=${encodeURIComponent(currentLastSync)}`
+          : "/api/attendance/daily-distance";
+        const distRes = await fetch(distUrl);
+
+        if (distRes.ok) {
+          const distData = await distRes.json();
+          setDailyDistanceMap((prev) => ({
+            ...prev,
+            ...(distData.distanceMap || {}),
+          }));
+        }
+
+        // Fetch attendance logs (full logs initially, incremental updates during polling)
+        const attUrl = currentLastSync
+          ? `/api/attendance/allattendance?since=${encodeURIComponent(currentLastSync)}`
+          : "/api/attendance/allattendance";
+        const attRes = await fetch(attUrl, { credentials: "include" });
+
+        // Record timestamp immediately before checking response
+        const nextSyncTime = new Date().toISOString();
 
         if (attRes.ok) {
-          const data = await attRes.json();
+          const resData = await attRes.json();
+          const newRecords = resData.data || [];
 
-          // 🔹 ADDED: store raw attendance only
-          setRawAttendance(data.data || []);
+          if (currentLastSync) {
+            setRawAttendance((prev) => {
+              const merged = [...prev];
+              newRecords.forEach((newRec: any) => {
+                const normalizeDate = (input: string) => {
+                  const d = new Date(input);
+                  if (isNaN(d.getTime())) return "";
+                  return d.toISOString().split("T")[0];
+                };
+                const newKey = `${newRec.phone}__${normalizeDate(newRec.date)}`;
+                const idx = merged.findIndex(
+                  (r) => `${r.phone}__${normalizeDate(r.date)}` === newKey
+                );
+                if (idx > -1) {
+                  merged[idx] = newRec;
+                } else {
+                  merged.push(newRec);
+                }
+              });
+              return merged;
+            });
+          } else {
+            setRawAttendance(newRecords);
+          }
+          lastSyncRef.current = nextSyncTime;
         }
       } catch (err: any) {
         console.error(err);
-        setError(err.message);
+        if (!isBackground) setError(err.message);
       } finally {
-        setLoading(false);
+        if (!isBackground) setLoading(false);
       }
     };
 
-    fetchData();
+    fetchData(); // initial fetch
+
+    const intervalId = setInterval(() => {
+      fetchData(true); // background fetch
+    }, 30000); // 30 seconds polling
+
+    return () => clearInterval(intervalId);
   }, []);
 
   // 🔹 ADDED: build attendance rows AFTER users + attendance are ready
@@ -141,6 +187,11 @@ export default function AdminPanel() {
         checkOut: r.checkOutTime
           ? new Date(r.checkOutTime).toLocaleTimeString()
           : undefined,
+        work_mode: r.work_mode,
+        first_visit: r.first_visit,
+        last_visit: r.last_visit,
+        km: r.km,
+        locations_cover: r.locations_cover,
       })),
     );
   }, [rawAttendance, employeeLocationMap, users]);
@@ -177,50 +228,48 @@ export default function AdminPanel() {
 
   if (loading)
     return (
-      <div className="flex h-screen items-center justify-center bg-gradient-to-br from-slate-50 to-blue-50">
+      <div className="flex h-64 items-center justify-center">
         <div className="text-center">
-          <Loader2 className="animate-spin mx-auto h-12 w-12 text-blue-600 mb-4" />
-          <p className="text-lg font-medium text-gray-600">
-            Loading admin panel...
-          </p>
+          <Loader2 className="animate-spin mx-auto h-10 w-10 text-blue-600 mb-3" />
+          <p className="text-sm font-medium text-gray-500">Loading admin panel...</p>
         </div>
       </div>
     );
 
   if (error)
     return (
-      <div className="flex h-screen items-center justify-center bg-gradient-to-br from-red-50 to-orange-50">
-        <div className="text-center bg-white p-8 rounded-lg shadow-lg">
-          <AlertCircle className="mx-auto h-16 w-16 text-red-500 mb-4" />
-          <p className="text-xl font-semibold text-red-600 mb-2">
-            Error Loading Data
-          </p>
-          <p className="text-gray-600">{error}</p>
+      <div className="flex h-64 items-center justify-center">
+        <div className="text-center bg-white/90 backdrop-blur-sm p-8 rounded-2xl shadow-xl border border-gray-200">
+          <AlertCircle className="mx-auto h-12 w-12 text-red-500 mb-3" />
+          <p className="text-lg font-semibold text-red-600 mb-1">Error Loading Data</p>
+          <p className="text-sm text-gray-500">{error}</p>
         </div>
       </div>
     );
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 p-2 md:p-8">
-      <div className="max-w-7xl mx-auto space-y-6">
-        <div className="flex justify-start gap-3">
-          <button
-            onClick={handleEmployeeClick}
-            className="bg-blue-500 hover:bg-blue-600 text-white font-medium py-2 px-2 rounded"
-          >
-            Employee Directory
-          </button>
+    <div className="space-y-5">
+      {/* Action Buttons Row */}
+      <div className="flex flex-wrap gap-3">
+        <button
+          onClick={handleEmployeeClick}
+          className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium shadow-md hover:shadow-lg transition-all"
+        >
+          Employee Directory
+        </button>
 
-          {/* 🔹 NEW: Create Employee Button */}
-          <button
-            onClick={handleCreateEmployeeClick}
-            className="bg-green-500 hover:bg-green-600 text-white font-medium py-2 px-4 rounded transition-colors duration-200 flex items-center gap-2"
-          >
-            <UserPlus className="w-4 h-4" />
-            Create Employee
-          </button>
-        </div>
+        {/* 🔹 NEW: Create Employee Button */}
+        <button
+          onClick={handleCreateEmployeeClick}
+          className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-green-600 hover:bg-green-700 text-white text-sm font-medium shadow-md hover:shadow-lg transition-all"
+        >
+          <UserPlus className="w-4 h-4" />
+          Create Employee
+        </button>
+      </div>
 
+      {/* Attendance Logs Card */}
+      <div className="rounded-2xl shadow-xl border border-gray-200 bg-white/90 backdrop-blur-sm overflow-hidden">
         <AttendanceLogs attRows={attRows} downloadCSV={downloadCSV} totalEmployees={users.length} dailyDistanceMap={dailyDistanceMap} users={users} />
       </div>
     </div>

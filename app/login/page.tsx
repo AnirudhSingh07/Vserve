@@ -34,8 +34,8 @@ export default function Login() {
         const res = await fetch("/api/me", { credentials: "include" });
         if (!res.ok) return;
         const data = await res.json();
-        if (data.loggedIn && data.employee) {
-          if (data.employee.role === "executive") router.replace("/dashboard");
+        if (data.loggedIn && data.user) {
+          if (data.user.role === "executive") router.replace("/dashboard");
           else router.replace("/admin");
         }
       } catch (err) {

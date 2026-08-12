@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { connectDB } from "@/lib/db";
 import DailyDistance from "@/models/dailydistance";
 import Employee from "@/models/employee";
@@ -8,12 +8,21 @@ export const dynamic = "force-dynamic";
 export const revalidate = 0;
 export const fetchCache = "force-no-store";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
     await connectDB();
 
-    // Fetch all daily distance records with employee phone populated
-    const records = await DailyDistance.find()
+    const since = req.nextUrl.searchParams.get("since");
+    const query: any = {};
+    if (since) {
+      const sinceDate = new Date(since);
+      if (!isNaN(sinceDate.getTime())) {
+        query.updatedAt = { $gt: sinceDate };
+      }
+    }
+
+    // Fetch daily distance records with employee phone populated
+    const records = await DailyDistance.find(query)
       .populate({
         path: "employeeId",
         select: "phone",

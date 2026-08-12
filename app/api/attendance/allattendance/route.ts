@@ -11,10 +11,23 @@ export const fetchCache = "force-no-store";
 export async function GET(req: NextRequest) {
   try {
     await connectDB();
-    console.log("📡 [API] /api/allattendance called");
+
+    const since = req.nextUrl.searchParams.get("since");
+    console.log(`📡 [API] /api/allattendance called (since: ${since})`);
+
+    const query: any = {};
+    if (since) {
+      const sinceDate = new Date(since);
+      if (!isNaN(sinceDate.getTime())) {
+        query.$or = [
+          { updatedAt: { $gt: sinceDate } },
+          { date: { $gt: sinceDate } }
+        ];
+      }
+    }
 
     // Fetch data fresh every time
-    const records = await Attendance.find()
+    const records = await Attendance.find(query)
       .populate("employee", "name phone email role department")
       .sort({ date: -1 });
 
@@ -47,6 +60,11 @@ export async function GET(req: NextRequest) {
       checkInTime: r.checkInTime,
       checkOutTime: r.checkOutTime,
       lateApproved: r.lateApproved ?? false,
+      work_mode: r.work_mode || "—",
+      first_visit: r.first_visit || null,
+      last_visit: r.last_visit || null,
+      km: r.km || 0,
+      locations_cover: r.locations_cover || 0,
     }));
 
     console.log("✅ Processed attendance:", data.length);
