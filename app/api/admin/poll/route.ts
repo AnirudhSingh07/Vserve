@@ -22,7 +22,7 @@ const NO_STORE = {
 };
 
 // Default window loaded by the admin panel on first open
-const DEFAULT_WINDOW_DAYS = 31;
+const DEFAULT_WINDOW_DAYS = 7;
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 const toDay = (d: Date) => d.toISOString().slice(0, 10);

@@ -44,7 +44,7 @@ const POLL_INTERVAL_MS = 3 * 60 * 1000;
 const POLL_START_MINUTES = 7 * 60; // 07:00 IST
 const POLL_END_MINUTES = 20 * 60 + 30; // 20:30 IST (auto-checkout cron runs at 20:00)
 // Days of attendance loaded on first open; older days load on demand via the date filter
-const DEFAULT_WINDOW_DAYS = 31;
+const DEFAULT_WINDOW_DAYS = 7;
 
 function isWithinPollingHours(now: Date = new Date()) {
   const parts = new Intl.DateTimeFormat("en-GB", {
