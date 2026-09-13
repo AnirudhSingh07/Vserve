@@ -20,7 +20,6 @@ export const revalidate = 0; // disable ISR (Incremental Static Regeneration)
 export async function GET() {
   try {
     await connectDB();
-    console.log("✅ Fetching latest employee data from DB...");
     const employees = await Employee.find({});
     return NextResponse.json({ success: true, employees },
       {

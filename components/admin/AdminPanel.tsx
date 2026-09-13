@@ -3,7 +3,7 @@
 import { UserPlus } from "lucide-react";
 import AttendanceLogs from "../admin/AttendanceLogs";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState, useRef } from "react";
+import { useCallback, useEffect, useMemo, useState, useRef } from "react";
 import { Loader2, AlertCircle, User } from "lucide-react";
 
 type User = {
@@ -36,6 +36,39 @@ type LateReq = {
   createdAt: number;
 };
 
+// ── Polling policy ─────────────────────────────────────────────────────────
+// Poll every 3 min (was 30 s), only while the tab is visible and only during
+// working hours in IST. Outside that window the panel still loads on open and
+// refreshes when the tab regains focus; it just doesn't poll in the background.
+const POLL_INTERVAL_MS = 3 * 60 * 1000;
+const POLL_START_MINUTES = 7 * 60; // 07:00 IST
+const POLL_END_MINUTES = 20 * 60 + 30; // 20:30 IST (auto-checkout cron runs at 20:00)
+// Days of attendance loaded on first open; older days load on demand via the date filter
+const DEFAULT_WINDOW_DAYS = 31;
+
+function isWithinPollingHours(now: Date = new Date()) {
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Asia/Kolkata",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(now);
+  const h = Number(parts.find((p) => p.type === "hour")?.value ?? 0);
+  const m = Number(parts.find((p) => p.type === "minute")?.value ?? 0);
+  const mins = h * 60 + m;
+  return mins >= POLL_START_MINUTES && mins <= POLL_END_MINUTES;
+}
+
+function daysAgoStr(days: number) {
+  return new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+}
+
+function normalizeDate(input: string) {
+  const d = new Date(input);
+  if (isNaN(d.getTime())) return "";
+  return d.toISOString().split("T")[0];
+}
+
 export default function AdminPanel() {
   const router = useRouter();
   const [admin, setAdmin] = useState<User | null>(null);
@@ -67,9 +100,29 @@ export default function AdminPanel() {
   }, [users]);
 
   const lastSyncRef = useRef<string | null>(null);
+  // Earliest day (YYYY-MM-DD) currently loaded into rawAttendance
+  const loadedFromRef = useRef<string>(daysAgoStr(DEFAULT_WINDOW_DAYS));
+  const lastFetchAtRef = useRef<number>(0);
+  const inFlightRef = useRef(false);
+
+  // Merge incoming rows into existing ones, keyed by phone + day
+  const mergeAttendance = (prev: any[], incoming: any[]) => {
+    const merged = [...prev];
+    incoming.forEach((newRec: any) => {
+      const newKey = `${newRec.phone}__${normalizeDate(newRec.date)}`;
+      const idx = merged.findIndex(
+        (r) => `${r.phone}__${normalizeDate(r.date)}` === newKey,
+      );
+      if (idx > -1) merged[idx] = newRec;
+      else merged.push(newRec);
+    });
+    return merged;
+  };
 
   useEffect(() => {
     const fetchData = async (isBackground = false) => {
+      if (inFlightRef.current) return;
+      inFlightRef.current = true;
       try {
         if (!isBackground && rawAttendance.length === 0) setLoading(true);
 
@@ -92,74 +145,82 @@ export default function AdminPanel() {
           setUsers(empData.employees || []);
         }
 
-        // Fetch daily distance (full map initially, incremental updates during polling)
-        const distUrl = currentLastSync
-          ? `/api/attendance/daily-distance?since=${encodeURIComponent(currentLastSync)}`
-          : "/api/attendance/daily-distance";
-        const distRes = await fetch(distUrl);
-
-        if (distRes.ok) {
-          const distData = await distRes.json();
-          setDailyDistanceMap((prev) => ({
-            ...prev,
-            ...(distData.distanceMap || {}),
-          }));
-        }
-
-        // Fetch attendance logs (full logs initially, incremental updates during polling)
-        const attUrl = currentLastSync
-          ? `/api/attendance/allattendance?since=${encodeURIComponent(currentLastSync)}`
-          : "/api/attendance/allattendance";
-        const attRes = await fetch(attUrl, { credentials: "include" });
+        // One combined request: attendance logs + daily distance map.
+        // Full window (last DEFAULT_WINDOW_DAYS) initially, incremental `since` afterwards.
+        const pollUrl = currentLastSync
+          ? `/api/admin/poll?since=${encodeURIComponent(currentLastSync)}`
+          : "/api/admin/poll";
+        const pollRes = await fetch(pollUrl, { credentials: "include" });
 
         // Record timestamp immediately before checking response
         const nextSyncTime = new Date().toISOString();
 
-        if (attRes.ok) {
-          const resData = await attRes.json();
-          const newRecords = resData.data || [];
+        if (pollRes.ok) {
+          const resData = await pollRes.json();
+          const newRecords = resData.attendance || [];
+
+          setDailyDistanceMap((prev) => ({
+            ...prev,
+            ...(resData.distanceMap || {}),
+          }));
 
           if (currentLastSync) {
-            setRawAttendance((prev) => {
-              const merged = [...prev];
-              newRecords.forEach((newRec: any) => {
-                const normalizeDate = (input: string) => {
-                  const d = new Date(input);
-                  if (isNaN(d.getTime())) return "";
-                  return d.toISOString().split("T")[0];
-                };
-                const newKey = `${newRec.phone}__${normalizeDate(newRec.date)}`;
-                const idx = merged.findIndex(
-                  (r) => `${r.phone}__${normalizeDate(r.date)}` === newKey
-                );
-                if (idx > -1) {
-                  merged[idx] = newRec;
-                } else {
-                  merged.push(newRec);
-                }
-              });
-              return merged;
-            });
+            setRawAttendance((prev) => mergeAttendance(prev, newRecords));
           } else {
             setRawAttendance(newRecords);
           }
           lastSyncRef.current = nextSyncTime;
+          lastFetchAtRef.current = Date.now();
         }
       } catch (err: any) {
         console.error(err);
         if (!isBackground) setError(err.message);
       } finally {
+        inFlightRef.current = false;
         if (!isBackground) setLoading(false);
       }
     };
 
     fetchData(); // initial fetch
 
+    // Background polling: only while the tab is visible and within working hours.
     const intervalId = setInterval(() => {
-      fetchData(true); // background fetch
-    }, 30000); // 30 seconds polling
+      if (document.hidden || !isWithinPollingHours()) return;
+      fetchData(true);
+    }, POLL_INTERVAL_MS);
 
-    return () => clearInterval(intervalId);
+    // When the admin comes back to the tab, refresh once if the data is stale.
+    const onVisible = () => {
+      if (document.hidden) return;
+      if (Date.now() - lastFetchAtRef.current >= POLL_INTERVAL_MS) fetchData(true);
+    };
+    document.addEventListener("visibilitychange", onVisible);
+
+    return () => {
+      clearInterval(intervalId);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, []);
+
+  // Called by AttendanceLogs when a date filter needs days older than what is loaded.
+  // Fetches the missing range once (no polling) and merges it in.
+  const ensureLoadedFrom = useCallback(async (from: string) => {
+    if (!from || from >= loadedFromRef.current) return;
+    const to = loadedFromRef.current;
+    loadedFromRef.current = from;
+    try {
+      const res = await fetch(
+        `/api/admin/poll?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`,
+        { credentials: "include" },
+      );
+      if (!res.ok) throw new Error("Failed to load older attendance");
+      const data = await res.json();
+      setDailyDistanceMap((prev) => ({ ...prev, ...(data.distanceMap || {}) }));
+      setRawAttendance((prev) => mergeAttendance(prev, data.attendance || []));
+    } catch (err) {
+      console.error(err);
+      loadedFromRef.current = to; // allow a retry
+    }
   }, []);
 
   // 🔹 ADDED: build attendance rows AFTER users + attendance are ready
@@ -270,7 +331,7 @@ export default function AdminPanel() {
 
       {/* Attendance Logs Card */}
       <div className="rounded-2xl shadow-xl border border-gray-200 bg-white/90 backdrop-blur-sm overflow-hidden">
-        <AttendanceLogs attRows={attRows} downloadCSV={downloadCSV} totalEmployees={users.length} dailyDistanceMap={dailyDistanceMap} users={users} />
+        <AttendanceLogs attRows={attRows} downloadCSV={downloadCSV} totalEmployees={users.length} dailyDistanceMap={dailyDistanceMap} users={users} onRangeNeeded={ensureLoadedFrom} />
       </div>
     </div>
   );

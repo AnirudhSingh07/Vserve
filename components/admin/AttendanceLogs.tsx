@@ -52,6 +52,9 @@ interface AttendanceLogsProps {
   totalEmployees?: number;
   // Map of "phone__YYYY-MM-DD" → totalKm for the daily distance column
   dailyDistanceMap?: Record<string, number>;
+  // Parent loads only recent days by default; call this with the earliest
+  // day a filter needs so older attendance is fetched on demand.
+  onRangeNeeded?: (from: string) => void;
 }
 
 // LocationCountCell removed as data comes from backend
@@ -84,6 +87,7 @@ export default function AttendanceLogs({
   totalEmployees,
   dailyDistanceMap = {},
   users = [],
+  onRangeNeeded,
 }: AttendanceLogsProps) {
   const router = useRouter();
   const [search, setSearch] = useState("");
@@ -106,6 +110,14 @@ export default function AttendanceLogs({
   const [toDate, setToDate] = useState(() => {
     return new Date().toISOString().split("T")[0];
   });
+
+  // Ask the parent for older data when the date filter reaches beyond what is loaded
+  useEffect(() => {
+    if (!onRangeNeeded) return;
+    if (dateFilterType === "all") onRangeNeeded("2000-01-01");
+    else if (dateFilterType === "date" && selectedDate) onRangeNeeded(selectedDate);
+    else if (dateFilterType === "range" && fromDate) onRangeNeeded(fromDate);
+  }, [dateFilterType, selectedDate, fromDate, onRangeNeeded]);
 
   // ✅ New Helper function to format time to 12-hour format
   function formatTo12Hour(timeStr?: string) {

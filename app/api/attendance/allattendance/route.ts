@@ -13,7 +13,6 @@ export async function GET(req: NextRequest) {
     await connectDB();
 
     const since = req.nextUrl.searchParams.get("since");
-    console.log(`📡 [API] /api/allattendance called (since: ${since})`);
 
     const query: any = {};
     if (since) {
@@ -31,7 +30,6 @@ export async function GET(req: NextRequest) {
       .populate("employee", "name phone email role department")
       .sort({ date: -1 });
 
-    console.log("📋 Total attendance records:", records.length);
 
     if (!records || records.length === 0) {
       return NextResponse.json(
@@ -67,7 +65,6 @@ export async function GET(req: NextRequest) {
       locations_cover: r.locations_cover || 0,
     }));
 
-    console.log("✅ Processed attendance:", data.length);
 
     return NextResponse.json(
       {

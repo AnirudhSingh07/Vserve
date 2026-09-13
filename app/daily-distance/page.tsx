@@ -1,6 +1,9 @@
 import { connectDB } from "@/lib/db";
 import DailyDistance from "@/models/dailydistance";
 
+// Render on every request (don't snapshot DB data at build time)
+export const dynamic = "force-dynamic";
+
 export default async function DailyDistancePage() {
   await connectDB();
 

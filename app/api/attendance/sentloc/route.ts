@@ -52,7 +52,6 @@ export async function GET(req: NextRequest) {
     })) as IDailyDistance | null;
 
     const totalDistanceKm = distanceRecord ? distanceRecord.totalKm : 0;
-    console.log("user total Distance travel :", totalDistanceKm);
 
     // 🧠 2. Build Query for Locations
     // We use targetDateStr to create the start/end times.
@@ -403,10 +402,6 @@ export async function POST(req: NextRequest) {
       : null;
     const isNewDay = !lastUpdate || !nowIST.isSame(lastUpdate, "day");
 
-    console.log("--- DEBUG DISTANCE START ---");
-    console.log("Employee found:", employee.name);
-    console.log("Has Baseline:", hasBaseline);
-    console.log("Is New Day:", isNewDay);
 
     // Only calculate distance if we have a baseline and it's NOT a new day
     if (hasBaseline && !isNewDay) {
@@ -415,8 +410,6 @@ export async function POST(req: NextRequest) {
 
       const apiKey = process.env.GOOGLE_MAPS_API_KEY;
 
-      console.log("Origin:", origin);
-      console.log("Destination:", destination);
 
       if (origin !== destination) {
         const url = `https://maps.googleapis.com/maps/api/directions/json?origin=${origin}&destination=${destination}&mode=driving&key=${apiKey}`;
@@ -424,12 +417,10 @@ export async function POST(req: NextRequest) {
         const res = await fetch(url);
         const routeData = await res.json();
 
-        console.log("Google API Status:", routeData.status);
 
         if (routeData.status === "OK") {
           // Meter ko KM me convert kar rahe hain
           segmentKm = routeData.routes[0].legs[0].distance.value / 1000;
-          console.log("Distance found (KM):", segmentKm);
         } else {
           // Agar Google mana kare (e.g. ZERO_RESULTS ya REQUEST_DENIED)
           console.error(
@@ -437,9 +428,8 @@ export async function POST(req: NextRequest) {
             routeData.error_message || "No error message",
           );
         }
-      } else {
-        console.log("Origin and Destination are same. Skipping API call.");
       }
+      // else: origin and destination are the same — skip the Directions call
     }
 
     // Daily Record Update
@@ -449,7 +439,6 @@ export async function POST(req: NextRequest) {
       { upsert: true, new: true },
     )) as IDailyDistance;
 
-    console.log("Total Today in DB:", updatedDailyRecord.totalKm);
 
     // --------------------------------------------------
     // 📍 DUPLICATE CHECK + LOCATION BREADCRUMB
@@ -468,7 +457,6 @@ export async function POST(req: NextRequest) {
 
     if (recentDuplicate) {
       // Duplicate detected — skip saving, still update employee state below
-      console.log("Duplicate location skipped for", employee.name);
     } else {
       await SentLocation.create({
         employeeId: employee._id,
