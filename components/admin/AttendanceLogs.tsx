@@ -475,18 +475,21 @@ export default function AttendanceLogs({
     router.push(`/admin/sentlocation/${phone}?date=${formattedDate}`);
   };
 
-  const filteredRows = attRows
-    .filter((row) => {
-      const rowDate = normalizeDate(row.date);
-      if (dateFilterType === "all") return true;
-      if (dateFilterType === "today") return rowDate === getTodayDate();
-      if (dateFilterType === "yesterday") return rowDate === getYesterdayDate();
-      if (dateFilterType === "date") return rowDate === selectedDate;
-      if (dateFilterType === "range") {
-        return rowDate >= fromDate && rowDate <= toDate;
-      }
-      return true;
-    })
+  // Rows for the selected period only (no search applied) — used by the
+  // Present / Absent stats so they follow the date filter, not the search box.
+  const dateFilteredRows = attRows.filter((row) => {
+    const rowDate = normalizeDate(row.date);
+    if (dateFilterType === "all") return true;
+    if (dateFilterType === "today") return rowDate === getTodayDate();
+    if (dateFilterType === "yesterday") return rowDate === getYesterdayDate();
+    if (dateFilterType === "date") return rowDate === selectedDate;
+    if (dateFilterType === "range") {
+      return rowDate >= fromDate && rowDate <= toDate;
+    }
+    return true;
+  });
+
+  const filteredRows = dateFilteredRows
     .filter((row) => {
       const query = search.toLowerCase();
       return (
@@ -498,20 +501,38 @@ export default function AttendanceLogs({
       );
     });
 
-  const todayDate = getTodayDate();
+  // Present / Absent for the selected period. For a single day this is
+  // "checked in that day"; for a range / all time it is "checked in at least
+  // once in the period".
+  const isSingleDayFilter =
+    dateFilterType === "today" || dateFilterType === "yesterday" || dateFilterType === "date";
+  const periodLabel =
+    dateFilterType === "today"
+      ? "Today"
+      : dateFilterType === "yesterday"
+        ? "Yesterday"
+        : dateFilterType === "date"
+          ? extractDate(selectedDate)
+          : dateFilterType === "range"
+            ? `${extractDate(fromDate)} – ${extractDate(toDate)}`
+            : "All Time";
+  // Only count rows that belong to a current employee (rows of deleted
+  // employees come back with phone "N/A" and must not inflate "Present").
+  const knownPhones = new Set(users.map((u) => u.phone));
   const todayAttendedPhones = new Set(
-    attRows
-      .filter((r) => normalizeDate(r.date) === todayDate && r.checkIn)
+    dateFilteredRows
+      .filter((r) => r.checkIn && (knownPhones.size === 0 || knownPhones.has(r.phone)))
       .map((r) => r.phone)
   );
   const totalAttendanceToday = todayAttendedPhones.size;
   const totalEmployeesCount = totalEmployees || 0;
-  const remainingToday = Math.max(0, totalEmployeesCount - totalAttendanceToday);
 
-  // Calculate absent employees detail today
+  // Employees with no check-in in the selected period
   const absentUsers = users.filter((u) => !todayAttendedPhones.has(u.phone));
+  const remainingToday = users.length
+    ? absentUsers.length
+    : Math.max(0, totalEmployeesCount - totalAttendanceToday);
 
-  console.log("Filtered rows data: ", filteredRows);
   return (
     <Card className="border-0 overflow-hidden w-full bg-transparent shadow-none">
       <CardHeader className="bg-gradient-to-r from-blue-50 to-white border-b border-gray-200 px-4 sm:px-6 py-4">
@@ -639,11 +660,11 @@ export default function AttendanceLogs({
               <p className="text-2xl font-bold text-gray-800 mt-1.5">{totalEmployeesCount}</p>
             </div>
             <div className="bg-white/80 px-4 py-3 rounded-xl border border-green-100 flex-1 min-w-[140px] shadow-sm">
-              <p className="text-xs text-green-600 font-semibold uppercase tracking-wider">Present Today</p>
+              <p className="text-xs text-green-600 font-semibold uppercase tracking-wider">Present {periodLabel}</p>
               <p className="text-2xl font-bold text-green-700 mt-1.5">{totalAttendanceToday}</p>
             </div>
             <div className="bg-white/80 px-4 py-3 rounded-xl border border-orange-100 flex-1 min-w-[140px] shadow-sm">
-              <p className="text-xs text-orange-600 font-semibold uppercase tracking-wider">Absent (Today)</p>
+              <p className="text-xs text-orange-600 font-semibold uppercase tracking-wider">Absent ({periodLabel})</p>
               <p className="text-2xl font-bold text-orange-700 mt-1.5">{remainingToday}</p>
             </div>
           </div>
@@ -823,12 +844,12 @@ export default function AttendanceLogs({
         </div>
       </CardContent>
 
-      {/* New section for Absent users today */}
-      {dateFilterType === "today" && absentUsers.length > 0 && (
+      {/* Absent users for the selected day */}
+      {isSingleDayFilter && absentUsers.length > 0 && (
         <div className="p-4 sm:p-6 bg-orange-50/30 border-t border-orange-100/50">
           <h3 className="text-base sm:text-lg font-semibold text-slate-800 mb-4 flex items-center gap-2">
             <AlertCircle className="w-5 h-5 text-orange-500" />
-            Absent / Remaining Today ({absentUsers.length})
+            Absent / Remaining {periodLabel} ({absentUsers.length})
           </h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
             {absentUsers.map((user, idx) => (
