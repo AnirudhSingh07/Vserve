@@ -251,11 +251,13 @@ export default function AdminPanel() {
         work_mode: r.work_mode,
         first_visit: r.first_visit,
         last_visit: r.last_visit,
-        km: r.km,
+        // Attendance.km is only populated for rows written after the sentloc
+        // change; fall back to the DailyDistance ledger (what the table used before).
+        km: r.km > 0 ? r.km : (dailyDistanceMap[`${r.phone}__${normalizeDate(r.date)}`] ?? r.km),
         locations_cover: r.locations_cover,
       })),
     );
-  }, [rawAttendance, employeeLocationMap, users]);
+  }, [rawAttendance, employeeLocationMap, users, dailyDistanceMap]);
 
   // 🔹 NEW: Handler for create employee navigation
   const handleCreateEmployeeClick = () => {
