@@ -4,6 +4,7 @@ import Attendance from "@/models/attendance";
 import DailyDistance from "@/models/dailydistance";
 import Employee from "@/models/employee";
 import SentLocation from "@/models/sentLocation";
+import mongoose from "mongoose";
 import dayjs from "dayjs";
 import utc from "dayjs/plugin/utc";
 import timezone from "dayjs/plugin/timezone";
@@ -60,13 +61,31 @@ const hasVisit = (v: any) => !!v && typeof v.lat === "number";
 // them. Derive those from the day's SentLocation breadcrumbs (+ check-in /
 // check-out), with the same rules the sentlocation page uses — one query for
 // the whole batch instead of one request per table row.
+// Fail-soft: if anything goes wrong here the rows simply keep "—" for these
+// columns instead of the whole admin feed returning 500.
 async function fillVisitFields(records: any[]) {
+  try {
+    await deriveVisitFields(records);
+  } catch (err) {
+    console.error("❌ Could not derive visit fields:", err);
+  }
+}
+
+const employeeIdOf = (r: any): string | null => {
+  const id = r.employee?._id ?? r.employee;
+  return id && mongoose.isValidObjectId(id) ? String(id) : null;
+};
+
+async function deriveVisitFields(records: any[]) {
   const needs = records.filter(
-    (r) => !hasVisit(r.first_visit) || !hasVisit(r.last_visit) || !r.work_mode || r.work_mode === "—",
+    (r) =>
+      employeeIdOf(r) !== null && // rows whose employee was deleted have nothing to derive
+      r.checkInTime &&
+      (!hasVisit(r.first_visit) || !hasVisit(r.last_visit) || !r.work_mode || r.work_mode === "—"),
   );
   if (needs.length === 0) return;
 
-  const empIds = Array.from(new Set(needs.map((r) => String(r.employee?._id ?? r.employee))));
+  const empIds = Array.from(new Set(needs.map((r) => employeeIdOf(r) as string)));
   const times = needs.map((r) => new Date(r.date).getTime());
   const lower = new Date(Math.min(...times) - DAY_MS);
   const upper = new Date(Math.max(...times) + DAY_MS);
@@ -87,7 +106,7 @@ async function fillVisitFields(records: any[]) {
   }
 
   for (const r of needs) {
-    const key = `${r.employee?._id ?? r.employee}__${istDay(r.date)}`;
+    const key = `${employeeIdOf(r)}__${istDay(r.date)}`;
     const dayCrumbs = byKey.get(key) ?? [];
 
     const points: { coords: any; date: number; isCheckOut?: boolean }[] = [];
