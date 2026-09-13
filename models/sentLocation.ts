@@ -10,6 +10,9 @@ const SentLocationSchema = new Schema({
   },
 });
 
+// Per-employee day lookups (sentloc GET) and the 60 s duplicate check (sentloc POST)
+SentLocationSchema.index({ employeeId: 1, date: 1 });
+
 const SentLocation =
   models.SentLocation || mongoose.model("SentLocation", SentLocationSchema);
 

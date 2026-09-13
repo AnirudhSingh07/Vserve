@@ -15,6 +15,9 @@ const DailyDistanceSchema = new Schema({
 }, { timestamps: true });
 // This ensures we only have one entry per employee per day
 DailyDistanceSchema.index({ employeeId: 1, date: 1 }, { unique: true });
+// Admin feed: date-window and incremental `since` queries
+DailyDistanceSchema.index({ date: 1 });
+DailyDistanceSchema.index({ updatedAt: -1 });
 
 const DailyDistance: Model<Document> =
   mongoose.models.DailyDistance ||

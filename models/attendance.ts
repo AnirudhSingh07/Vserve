@@ -28,6 +28,11 @@ const AttendanceSchema = new Schema({
   locations_cover: { type: Number, default: 0 },
 }, { timestamps: true });
 
+// Indexes for the admin feed (date window / incremental `since`) and per-employee lookups
+AttendanceSchema.index({ date: -1 });
+AttendanceSchema.index({ updatedAt: -1 });
+AttendanceSchema.index({ employee: 1, date: -1 });
+
 const Attendance =
   models.Attendance || mongoose.model("Attendance", AttendanceSchema);
 

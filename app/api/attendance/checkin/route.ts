@@ -28,7 +28,6 @@ export async function POST(req: NextRequest) {
     // ✅ Use IST timezone
     const now = dayjs().tz("Asia/Kolkata");
     const currentHour = now.hour();
-    console.log("current hours from checkin (IST): ", currentHour);
 
     if (currentHour < WORK_START_HOUR || currentHour >= WORK_END_HOUR) {
       return NextResponse.json(
