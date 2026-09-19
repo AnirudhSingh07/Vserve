@@ -8,6 +8,8 @@ import dayjs from "dayjs";
 import utc from "dayjs/plugin/utc";
 import timezone from "dayjs/plugin/timezone";
 import { connectDB } from "@/lib/db"; // adjust if your path differs
+import { getDrivingKm, isValidCoords } from "@/lib/geo";
+import { applyVisitFields } from "@/lib/attendanceVisit";
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
@@ -182,6 +184,15 @@ export async function POST(req: NextRequest) {
     await connectDB();
     const { phone, coords, hashalt } = await req.json();
 
+    // Missing coordinates used to reach the breadcrumb query and throw a 500
+    // with an empty body, which the app reports as a JSON parse error.
+    if (!phone || typeof coords?.lat !== "number" || typeof coords?.lng !== "number") {
+      return NextResponse.json(
+        { success: false, error: "Phone and coordinates are required" },
+        { status: 400 },
+      );
+    }
+
     const employee = await Employee.findOne({ phone });
     if (!employee)
       return NextResponse.json(
@@ -192,44 +203,46 @@ export async function POST(req: NextRequest) {
     const nowIST = dayjs().tz("Asia/Kolkata");
     const todayStr = nowIST.format("YYYY-MM-DD");
     const timestamp = nowIST.toDate();
+    const startOfDay = nowIST.startOf("day").toDate();
+    const endOfDay = nowIST.endOf("day").toDate();
 
-    let segmentKm = 0;
-    const hasBaseline = !!employee.lastKnownCoords?.lat;
+    // Today's attendance row is needed both to resolve the distance baseline
+    // and to record the visit fields below — read it once.
+    let attendance = await Attendance.findOne({
+      employee: employee._id,
+      date: { $gte: startOfDay, $lte: endOfDay },
+    });
 
+    // --------------------------------------------------
+    // 🛣️ DISTANCE BASELINE
+    // --------------------------------------------------
+    // A leg is only measured from a baseline recorded earlier *the same day*.
+    // A baseline left over from yesterday must never be used: it would bill the
+    // overnight journey home as work travel on the following morning.
+    //
+    // Check-in records the baseline, so the office → first-visit leg is
+    // measured like any other. When that baseline is missing or stale — an
+    // employee whose check-in predates this behaviour, or a baseline write that
+    // failed — today's check-in position stands in for it, so the first leg of
+    // the day is still counted rather than silently discarded.
     const lastUpdate = employee.lastLocationTimestamp
       ? dayjs(employee.lastLocationTimestamp).tz("Asia/Kolkata")
       : null;
-    const isNewDay = !lastUpdate || !nowIST.isSame(lastUpdate, "day");
+    const baselineIsFromToday = !!lastUpdate && nowIST.isSame(lastUpdate, "day");
 
+    let origin: { lat: number; lng: number } | null = null;
 
-    // Only calculate distance if we have a baseline and it's NOT a new day
-    if (hasBaseline && !isNewDay) {
-      const origin = `${employee.lastKnownCoords.lat},${employee.lastKnownCoords.lng}`;
-      const destination = `${coords.lat},${coords.lng}`;
-
-      const apiKey = process.env.GOOGLE_MAPS_API_KEY;
-
-
-      if (origin !== destination) {
-        const url = `https://maps.googleapis.com/maps/api/directions/json?origin=${origin}&destination=${destination}&mode=driving&key=${apiKey}`;
-
-        const res = await fetch(url);
-        const routeData = await res.json();
-
-
-        if (routeData.status === "OK") {
-          // Meter ko KM me convert kar rahe hain
-          segmentKm = routeData.routes[0].legs[0].distance.value / 1000;
-        } else {
-          // Agar Google mana kare (e.g. ZERO_RESULTS ya REQUEST_DENIED)
-          console.error(
-            "Google Error Message:",
-            routeData.error_message || "No error message",
-          );
-        }
-      }
-      // else: origin and destination are the same — skip the Directions call
+    if (baselineIsFromToday && isValidCoords(employee.lastKnownCoords)) {
+      origin = employee.lastKnownCoords;
+    } else if (
+      attendance?.checkInTime &&
+      dayjs(attendance.checkInTime).tz("Asia/Kolkata").isSame(nowIST, "day") &&
+      isValidCoords(attendance.checkInLocation)
+    ) {
+      origin = attendance.checkInLocation;
     }
+
+    const segmentKm = await getDrivingKm(origin, coords);
 
     // Daily Record Update
     const updatedDailyRecord = (await DailyDistance.findOneAndUpdate(
@@ -268,53 +281,25 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    if (coords && coords.lat !== 0 && coords.lng !== 0) {
-      const startOfDay = nowIST.startOf("day").toDate();
-      const endOfDay = nowIST.endOf("day").toDate();
-      
-      let attendance = await Attendance.findOne({
-        employee: employee._id,
-        date: { $gte: startOfDay, $lte: endOfDay },
-      });
-      
+    if (isValidCoords(coords)) {
       if (!attendance) {
-        attendance = new Attendance({
-          employee: employee._id,
-          date: nowIST.toDate(),
-        });
+        // Re-read before creating: the row was absent when the baseline was
+        // resolved, but a concurrent check-in may have created it while the
+        // Directions lookup was in flight, and two rows for one employee-day
+        // would show up as duplicate lines in the admin table.
+        attendance =
+          (await Attendance.findOne({
+            employee: employee._id,
+            date: { $gte: startOfDay, $lte: endOfDay },
+          })) ||
+          new Attendance({
+            employee: employee._id,
+            date: nowIST.toDate(),
+          });
       }
 
-      const OFFICE_CENTER = { lat: 22.723541, lng: 75.884507 };
-      const BHOPAL_OFFICE_CENTER = { lat: 23.2349541, lng: 77.4354195 };
-      
-      const haversineMeters = (c1: { lat: number; lng: number }, c2: { lat: number; lng: number }) => {
-        const R = 6371000;
-        const dLat = ((c2.lat - c1.lat) * Math.PI) / 180;
-        const dLng = ((c2.lng - c1.lng) * Math.PI) / 180;
-        const lat1 = (c1.lat * Math.PI) / 180;
-        const lat2 = (c2.lat * Math.PI) / 180;
-        const a = Math.sin(dLat / 2) ** 2 + Math.sin(dLng / 2) ** 2 * Math.cos(lat1) * Math.cos(lat2);
-        return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-      };
+      applyVisitFields(attendance, coords, nowIST.format("hh:mm A"));
 
-      const dIndore = haversineMeters(coords, OFFICE_CENTER);
-      const dBhopal = haversineMeters(coords, BHOPAL_OFFICE_CENTER);
-      const isInsideOffice = dIndore <= 200 || dBhopal <= 200;
-      
-      const timeStr = nowIST.format("hh:mm A");
-
-      if (!attendance.work_mode || attendance.work_mode === "—") {
-        attendance.work_mode = isInsideOffice ? "Office" : "Field";
-      }
-
-      if (!isInsideOffice) {
-        if (!attendance.first_visit || !attendance.first_visit.lat) {
-          attendance.first_visit = { lat: coords.lat, lng: coords.lng, time: timeStr };
-        }
-      }
-
-      attendance.last_visit = { lat: coords.lat, lng: coords.lng, time: timeStr };
-      
       if (typeof attendance.km !== "number") attendance.km = 0;
       attendance.km += segmentKm;
 

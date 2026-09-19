@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { connectDB } from "@/lib/db";
 import Employee from "@/models/employee";
 import Attendance from "@/models/attendance";
+import { isValidCoords } from "@/lib/geo";
+import { applyVisitFields } from "@/lib/attendanceVisit";
 import dayjs from "dayjs";
 import utc from "dayjs/plugin/utc";
 import timezone from "dayjs/plugin/timezone";
@@ -64,40 +66,30 @@ export async function POST(req: NextRequest) {
     attendance.checkInLocation = coords;
     attendance.checkedIn = true;
 
-    if (coords && coords.lat !== 0 && coords.lng !== 0) {
-      const OFFICE_CENTER = { lat: 22.723541, lng: 75.884507 };
-      const BHOPAL_OFFICE_CENTER = { lat: 23.2349541, lng: 77.4354195 };
-      
-      const haversineMeters = (c1: { lat: number; lng: number }, c2: { lat: number; lng: number }) => {
-        const R = 6371000;
-        const dLat = ((c2.lat - c1.lat) * Math.PI) / 180;
-        const dLng = ((c2.lng - c1.lng) * Math.PI) / 180;
-        const lat1 = (c1.lat * Math.PI) / 180;
-        const lat2 = (c2.lat * Math.PI) / 180;
-        const a = Math.sin(dLat / 2) ** 2 + Math.sin(dLng / 2) ** 2 * Math.cos(lat1) * Math.cos(lat2);
-        return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-      };
-
-      const dIndore = haversineMeters(coords, OFFICE_CENTER);
-      const dBhopal = haversineMeters(coords, BHOPAL_OFFICE_CENTER);
-      const isInsideOffice = dIndore <= 200 || dBhopal <= 200;
-      
-      const timeStr = now.format("hh:mm A");
-
-      if (!attendance.work_mode || attendance.work_mode === "—") {
-        attendance.work_mode = isInsideOffice ? "Office" : "Field";
-      }
-
-      if (!isInsideOffice) {
-        if (!attendance.first_visit || !attendance.first_visit.lat) {
-          attendance.first_visit = { lat: coords.lat, lng: coords.lng, time: timeStr };
-        }
-      }
-
-      attendance.last_visit = { lat: coords.lat, lng: coords.lng, time: timeStr };
+    if (isValidCoords(coords)) {
+      applyVisitFields(attendance, coords, now.format("hh:mm A"));
     }
 
     await attendance.save();
+
+    // 🛣️ Seed the day's distance baseline.
+    //
+    // Distance is always measured from `lastKnownCoords`, and legs are only
+    // counted when that baseline was recorded on the same day (a baseline left
+    // over from yesterday would otherwise bill the overnight trip home).
+    // Check-in used to leave both fields untouched, so the first location an
+    // executive tagged had no same-day baseline to measure from — it silently
+    // became the starting point and the office → first-visit leg was lost.
+    // Recording the check-in position here makes that leg measurable like any
+    // other, without weakening the new-day guard.
+    if (isValidCoords(coords)) {
+      await Employee.findByIdAndUpdate(employee._id, {
+        $set: {
+          lastKnownCoords: { lat: Number(coords.lat), lng: Number(coords.lng) },
+          lastLocationTimestamp: now.toDate(),
+        },
+      });
+    }
 
     return NextResponse.json({ success: true, message: "Checked in successfully." });
   } catch (err: any) {

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { connectDB } from "@/lib/db";
 import Employee from "@/models/employee";
 import Attendance from "@/models/attendance";
+import { getDrivingKm, isValidCoords } from "@/lib/geo";
 import dayjs from "dayjs";
 import utc from "dayjs/plugin/utc";
 import timezone from "dayjs/plugin/timezone";
@@ -46,43 +47,34 @@ export async function POST(req: NextRequest) {
 
  
     // ✅ Normal manual checkout (within hours)
+    // Recorded before the distance call so a slow or failing Directions lookup
+    // can never cost the employee their check-out.
     attendance.checkOutTime = now.toDate();
     attendance.checkOutLocation = coords;
     attendance.checkedIn = false;
     await attendance.save();
 
-    // --- CHECKOUT DISTANCE CALCULATION (Same as sentloc) ---
+    // --- CHECKOUT DISTANCE CALCULATION (same baseline rules as sentloc) ---
     const nowIST = dayjs().tz("Asia/Kolkata");
     const todayStr = nowIST.format("YYYY-MM-DD");
 
-    let segmentKm = 0;
-    const hasBaseline = !!employee.lastKnownCoords?.lat;
-
+    // Only a baseline recorded earlier today may be measured from; otherwise
+    // fall back to today's check-in position, so an employee who checked in and
+    // drove straight to check-out still has that leg counted.
     const lastUpdate = employee.lastLocationTimestamp
       ? dayjs(employee.lastLocationTimestamp).tz("Asia/Kolkata")
       : null;
-    const isNewDay = !lastUpdate || !nowIST.isSame(lastUpdate, "day");
+    const baselineIsFromToday = !!lastUpdate && nowIST.isSame(lastUpdate, "day");
 
-    if (hasBaseline && !isNewDay && coords && coords.lat && coords.lng) {
-      const origin = `${employee.lastKnownCoords.lat},${employee.lastKnownCoords.lng}`;
-      const destination = `${coords.lat},${coords.lng}`;
+    let origin: { lat: number; lng: number } | null = null;
 
-      if (origin !== destination) {
-        const apiKey = process.env.GOOGLE_MAPS_API_KEY;
-        const url = `https://maps.googleapis.com/maps/api/directions/json?origin=${origin}&destination=${destination}&mode=driving&key=${apiKey}`;
-
-        try {
-          const res = await fetch(url);
-          const routeData = await res.json();
-
-          if (routeData.status === "OK") {
-            segmentKm = routeData.routes[0].legs[0].distance.value / 1000;
-          }
-        } catch (err) {
-          console.error("Error fetching map api during checkout", err);
-        }
-      }
+    if (baselineIsFromToday && isValidCoords(employee.lastKnownCoords)) {
+      origin = employee.lastKnownCoords;
+    } else if (isValidCoords(attendance.checkInLocation)) {
+      origin = attendance.checkInLocation;
     }
+
+    const segmentKm = await getDrivingKm(origin, coords);
 
     if (segmentKm > 0) {
       await DailyDistance.findOneAndUpdate(
@@ -90,9 +82,18 @@ export async function POST(req: NextRequest) {
         { $inc: { totalKm: segmentKm } },
         { upsert: true, new: true }
       );
+
+      // Keep the attendance ledger in step with the daily ledger. The admin
+      // table prefers Attendance.km whenever it is non-zero, so leaving this
+      // out dropped the final leg from the figure shown for anyone who had
+      // tagged at least one location during the day.
+      await Attendance.updateOne(
+        { _id: attendance._id },
+        { $inc: { km: segmentKm } }
+      );
     }
 
-    if (coords && coords.lat && coords.lng) {
+    if (isValidCoords(coords)) {
       await Employee.findByIdAndUpdate(employee._id, {
         $set: {
           lastKnownCoords: {
