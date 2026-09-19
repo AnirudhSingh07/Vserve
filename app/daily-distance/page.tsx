@@ -1,5 +1,11 @@
 import { connectDB } from "@/lib/db";
 import DailyDistance from "@/models/dailydistance";
+// Imported for its side effect as much as its value: populate() resolves
+// "Employee" through mongoose's model registry, and a page that never pulls
+// the model into its own bundle throws MissingSchemaError the first time it
+// runs in a fresh serverless instance. Passing it to populate() as `model`
+// also stops a bundler from dropping an import whose value looks unused.
+import Employee from "@/models/employee";
 import dayjs from "dayjs";
 
 // Render on every request (don't snapshot DB data at build time)
@@ -41,6 +47,7 @@ export default async function DailyDistancePage({ searchParams }: Props) {
     .populate({
       path: "employeeId",
       select: "name phone", // only fields you need
+      model: Employee,
     })
     .lean();
 
